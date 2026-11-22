@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default [
+  { ignores: ['src/generated/prisma/**'] },
   {
     ...js.configs.recommended,
     files: ['test/**/*.cjs'],
