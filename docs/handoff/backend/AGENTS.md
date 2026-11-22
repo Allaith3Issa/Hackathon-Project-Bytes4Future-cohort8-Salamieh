@@ -36,7 +36,7 @@ These instructions apply to work under the repository-root `api/` application di
 
 - Deny access by default. Explicitly designate public routes (`/auth/*`, `/public/*`), verify bearer tokens, and enforce both role (`admin`, `merchant`, `marketer`, `customer`) and resource ownership in the backend. Never let public input create an admin, set verification status, credit a top-up, modify a wallet balance, or alter a payout status. Return only fields the caller is allowed to see.
 - Validate request bodies, route parameters, and query parameters. Reject unknown fields, bound input lengths and pagination, validate uploaded receipt image MIME/size limits, use parameterized database queries, and use generic login failures. Apply rate limits to login, referral clicks, QR generation, and scanner lookups. Restrict CORS to configured origins where browser access is needed.
-- Hash passwords with a password-hashing algorithm such as Argon2id. Keep credentials and signing keys in server-side environment variables. Never commit `.env`, expose stack traces, or log passwords, access tokens, refresh tokens, or QR tokens.
+- Use bcrypt with 10 salt rounds for demo credentials and verify them with `bcrypt.compare()`, following B4F Board. Enforce bcrypt's 72-byte UTF-8 password limit before hashing. Argon2id is also an accepted password-hashing algorithm when the verifier supports it. Keep credentials and signing keys in server-side environment variables. Never commit `.env`, expose stack traces, or log passwords, password hashes, access tokens, refresh tokens, or QR tokens.
 
 ## Session refresh and admin sign-in
 
