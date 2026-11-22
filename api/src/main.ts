@@ -1,13 +1,25 @@
 import 'reflect-metadata';
-import { ValidationPipe } from '@nestjs/common';
+import { ArgumentsHost, BadRequestException, Catch, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { BaseExceptionFilter, NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+
+@Catch(BadRequestException)
+class ValidationErrorFilter extends BaseExceptionFilter<BadRequestException> {
+  override catch(_error: BadRequestException, host: ArgumentsHost) {
+    super.catch(new BadRequestException({
+      statusCode: 400,
+      code: 'VALIDATION_ERROR',
+      message: 'Invalid request payload.',
+    }), host);
+  }
+}
 
 export async function createApp(options: { logger?: false } = {}) {
   const app = await NestFactory.create(AppModule, options);
   app.setGlobalPrefix('api/v1');
+  app.useGlobalFilters(new ValidationErrorFilter(app.getHttpAdapter()));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

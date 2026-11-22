@@ -7,7 +7,7 @@ export default [
     ...js.configs.recommended,
     files: ['test/**/*.cjs'],
     languageOptions: {
-      globals: { fetch: 'readonly' },
+      globals: { fetch: 'readonly', process: 'readonly' },
     },
   },
   ...tseslint.configs.recommended.map((config) => ({
