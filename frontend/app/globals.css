@@ -42,7 +42,6 @@
   .notice { @apply rounded-lg bg-info-bg px-4 py-3 text-sm leading-7 text-info; }
   .notice-error { @apply rounded-lg border border-danger/30 bg-white px-4 py-3 text-sm leading-7 text-danger; }
   .page-title { @apply text-2xl leading-tight font-bold sm:text-3xl; }
-  .brand-mark { @apply grid size-9 shrink-0 place-items-center rounded-lg bg-dusty-mauve text-xl font-semibold leading-none text-ink; }
   .milestone-meter {
     @apply block h-2 w-full overflow-hidden rounded-full bg-mauve accent-action;
   }

@@ -1,6 +1,6 @@
 ---
-name: "عروض السلمية"
-description: "Shared design tokens for the Arabic storefront and Android marketer app"
+name: "مردود | Mardood"
+description: "Shared brand and design tokens for the Mardood Arabic storefront and Android marketer app"
 colors:
   action: "#B54718"
   action-hover: "#943710"
@@ -38,7 +38,7 @@ spacing:
   section: "24px"
 ---
 
-# عروض السلمية · Web and mobile design
+# مردود | Mardood · Web and mobile design
 
 ## Overview
 
@@ -47,6 +47,14 @@ Use this guide for Alaa’s public/customer web pages, Tayma’s merchant/admin 
 The Android app shares the same typography, colors, controls, and financial hierarchy. Its demo flow covers marketer sign-in, browsing open campaigns, joining and sharing an offer, and viewing commission. The shopper opens the shared offer in the browser and gets the Offer QR there. Merchant redemption happens on the web.
 
 Repository references: [current web styles](app/globals.css), [research and imagery](DESIGN-NOTES.md), [frontend setup](README.md), [web assignments](../docs/tasks/02-frontend.md), [mobile assignments](../docs/tasks/03-mobile.md), and the [API contract](../docs/handoff/API_CONTRACT.md). If this file is shared by itself, look for these paths in the team repository.
+
+## Brand and logo
+
+- Write **مردود** in Arabic UI, accessible labels, and browser titles. Use **Mardood** where an English project name is needed. The supplied logo already includes both wordmarks.
+- Use the [full transparent logo](public/brand/mardood-logo.png) on white or warm canvas. Keep the orange offer tag on the right in RTL layouts. Preserve its aspect ratio, built-in clear space, and original colors.
+- Use the [square symbol PNG](public/brand/mardood-symbol.png) for the browser tab and for compact brand placements. The symbol uses the existing offer tag and return arrow.
+- **Tayma · Web:** Merchant and admin screens should inherit the shared [web layout](app/layout.tsx). The logo links to the home page with the accessible name **مردود، الصفحة الرئيسية**. It renders at 112 px wide on phones and 144 px from 640 px upward, with a 44 px minimum link height. Let the navigation wrap when space is tight.
+- **Esmaeel · Expo:** Use the full logo on sign-in and the square symbol where a compact mark is needed. Display it with `resizeMode="contain"` and use **مردود** for the Android display name. For the launcher icon, place the symbol on the platform’s icon canvas and check the Android adaptive icon crop on a device.
 
 ## Colors
 
@@ -103,7 +111,7 @@ Use 8-unit corners for controls and 12-unit corners for panels and image frames.
 
 | Surface | Use and behavior |
 | --- | --- |
-| Navigation and homepage | Use the existing wordmark and role-appropriate links. Keep the bakery photo and two-line desktop headline as the main visual, with the steps in the light mauve section below. |
+| Navigation and homepage | Use the shared Mardood logo and role-appropriate links. Keep the bakery photo and two-line desktop headline as the main visual, with the steps in the light mauve section below. |
 | Forms and recovery | Reuse `surface`, `page-title`, `button-primary`, `button-secondary`, `notice`, and `notice-error`. Keep Arabic errors close to the relevant input or action. Show a retry for a temporary offer load failure and a separate message for an invalid referral. |
 | Public offer and QR | Label the API-provided final price before the action. Reserve image space, then use the light mauve store panel when the API has no photo. Keep the QR, manual code, and copy action together. On narrow screens, stack the code and button. Differentiate successful copying from the fallback that selects the text. |
 | Customer cashback | Put the available balance on Deep Mauve Charcoal and the locked balance on light mauve. Show both milestone conditions separately and explain that both are required. Keep purchase amounts aligned and use an explanatory empty state when the customer has no purchases. |
