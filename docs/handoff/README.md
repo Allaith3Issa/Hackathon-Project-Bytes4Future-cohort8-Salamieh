@@ -7,7 +7,7 @@ Local affiliate marketing and cashback platform connecting small businesses in S
 ## Core Architecture & Tech Stack
 
 - **Web Frontend (`frontend/`)**: Next.js + TypeScript (Arabic RTL)
-- **Backend API (`backend/`)**: NestJS + TypeScript + Swagger (`/api/v1`)
+- **Backend API (`api/`)**: NestJS + TypeScript + Swagger (`/api/v1`)
 - **Database**: PostgreSQL (single source of truth; no direct DB access from web or mobile)
 - **Mobile App (separate repo)**: React Native with Expo + TypeScript (Marketer Android app)
 - **Payments Model**: Cash-in-store at checkout + Prepaid Merchant Platform Balance (SYP) + Closed-loop Customer Cashback Vouchers + Admin-verified Sham Cash / manual payouts for marketers

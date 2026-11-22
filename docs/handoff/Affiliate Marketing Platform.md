@@ -35,8 +35,8 @@ Prepaid reserves fund commissions for eligible sales settled through the platfor
 
 | Member | Area | Repository |
 | --- | --- | --- |
-| **Allaith Issa (Team Leader)** | Backend (NestJS + PostgreSQL) | Website repo, `backend/` |
-| **Laith Alhaj Husain** | Backend (NestJS + PostgreSQL) | Website repo, `backend/` |
+| **Allaith Issa (Team Leader)** | Backend (NestJS + PostgreSQL) | Website repo, `api/` |
+| **Laith Alhaj Husain** | Backend (NestJS + PostgreSQL) | Website repo, `api/` |
 | **Alaa Esmail** | Frontend (Next.js — Public, Customer & Marketer) | Website repo, `frontend/` |
 | **Tayma Watfa** | Frontend (Next.js — Merchant & Admin) | Website repo, `frontend/` |
 | **Esmail Mahfoud** | Mobile App (React Native with Expo — Marketer) | Mobile app repo |
