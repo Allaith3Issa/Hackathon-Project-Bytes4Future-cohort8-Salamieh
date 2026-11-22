@@ -30,6 +30,7 @@ export async function createApp(options: { logger?: false } = {}) {
 
 async function bootstrap() {
   const app = await createApp();
+  app.enableShutdownHooks();
   const config = app.get(ConfigService);
   const port = Number(config.get<string>('PORT', '3000'));
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
