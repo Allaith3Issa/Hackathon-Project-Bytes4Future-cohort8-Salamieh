@@ -85,7 +85,7 @@ test('Step 04A login HTTP contract', async (t) => {
     });
     const payload = await new JwtService().verifyAsync(body.accessToken, { secret, algorithms: ['HS256'] });
     const [session] = persistedSessions;
-    assert.deepEqual(Object.keys(payload).sort(), ['exp', 'iat', 'roles', 'sid', 'sub']);
+    assert.deepEqual(Object.keys(payload).sort(), ['exp', 'iat', 'jti', 'roles', 'sid', 'sub']);
     assert.equal(payload.sub, regular.id);
     assert.equal(payload.sid, session.id);
     assert.deepEqual(payload.roles, body.user.roles);
