@@ -27,6 +27,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     await this.client?.$disconnect();
   }
 
+  getClient(): PrismaClient {
+    if (!this.client) {
+      throw new Error('Database connection is not configured.');
+    }
+    return this.client;
+  }
+
   async checkConnection() {
     if (!this.client) {
       throw new Error('Set DATABASE_URL before running the PostgreSQL check.');
