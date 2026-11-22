@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -13,6 +13,18 @@ export async function createApp(options: { logger?: false } = {}) {
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: (errors) =>
+        new BadRequestException({
+          statusCode: 400,
+          code: 'VALIDATION_ERROR',
+          message: 'One or more request fields are invalid.',
+          fieldErrors: Object.fromEntries(
+            errors.map((error) => [
+              error.property,
+              Object.values(error.constraints ?? {}),
+            ]),
+          ),
+        }),
     }),
   );
 
