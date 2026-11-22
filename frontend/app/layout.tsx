@@ -6,9 +6,10 @@ import "@fontsource/ibm-plex-sans-arabic/600.css";
 import "@fontsource/ibm-plex-sans-arabic/700.css";
 import { signOut } from "@/app/actions";
 import { SessionRefresh } from "@/components/session-refresh";
-import { sessionTokens } from "@/lib/session";
+
 import mardoodLogo from "../public/brand/mardood-logo.png";
 import "./globals.css";
+import { getAccount, sessionTokens } from "@/lib/session";
 
 const brandName = "مردود";
 
@@ -20,6 +21,9 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { accessToken, refreshToken } = await sessionTokens();
+  const account = accessToken ? await getAccount().catch(() => null) : null;
+  const has = (role: "admin" | "merchant" | "customer") => !account || account.roles.includes(role);
+  const link = "inline-flex min-h-11 items-center rounded-lg px-2 font-semibold hover:bg-mauve sm:px-3";
   return (
     <html lang="ar" dir="rtl">
       <body className="min-h-screen">
@@ -35,7 +39,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <nav aria-label="التنقل الرئيسي" className="flex flex-wrap items-center gap-2 text-sm sm:gap-4 sm:text-base">
               {accessToken ? (
                 <>
-                  <Link href="/customer" className="inline-flex min-h-11 items-center rounded-lg px-2 font-semibold hover:bg-mauve sm:px-3">الكاش باك</Link>
+                  {has("customer") && <Link href="/customer" className={link}>الكاش باك</Link>}
+                  {account?.roles.includes("merchant") && <Link href="/merchant/campaigns" className={link}>لوحة التاجر</Link>}
+                  {account?.roles.includes("admin") && <Link href="/admin/topups" className={link}>الإدارة</Link>}
                   <form action={signOut}><button className="button-secondary" type="submit">تسجيل الخروج</button></form>
                 </>
               ) : <Link href="/login" className="button-secondary px-3 sm:px-4">تسجيل الدخول</Link>}
