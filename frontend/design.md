@@ -1,0 +1,114 @@
+---
+name: "عروض السلمية"
+description: "Shared design tokens for the Arabic storefront and Android marketer app"
+colors:
+  action: "#B54718"
+  action-hover: "#943710"
+  dusty-mauve: "#B78391"
+  mauve-tint: "#F3E6E8"
+  ink: "#503C44"
+  muted: "#6F555F"
+  canvas: "#FBF7F2"
+  surface: "#FFFFFF"
+  rule: "#DDCBD0"
+  control: "#987582"
+  success: "#315D47"
+  success-bg: "#EDF5EF"
+  danger: "#982D3D"
+  info: "#534767"
+  info-bg: "#F1EDF5"
+typography:
+  display:
+    fontFamily: "IBM Plex Sans Arabic"
+    fontWeight: 700
+  body:
+    fontFamily: "IBM Plex Sans Arabic"
+    fontSize: "16px"
+    fontWeight: 400
+  label:
+    fontFamily: "IBM Plex Sans Arabic"
+    fontSize: "14px"
+    fontWeight: 600
+rounded:
+  control: "8px"
+  panel: "12px"
+spacing:
+  compact: "8px"
+  gutter: "16px"
+  section: "24px"
+---
+
+# عروض السلمية · Web and mobile design
+
+## Overview
+
+Use this guide to match the current Next.js interface in Esmaeel’s React Native / Expo marketer app. The web homepage leads with a photograph of a local bakery counter. The public offer puts the product name and price before the QR action. The customer dashboard gives the available balance the most emphasis and places progress and purchase history below it.
+
+The Android app shares the same typography, colors, controls, and financial hierarchy. Its demo flow covers marketer sign-in, browsing open campaigns, joining and sharing an offer, and viewing commission. The shopper opens the shared offer in the browser and gets the Offer QR there. Merchant redemption happens on the web.
+
+Repository references: [current web styles](app/globals.css), [research and imagery](DESIGN-NOTES.md), [mobile assignments](../docs/tasks/03-mobile.md), and the [API contract](../docs/handoff/API_CONTRACT.md). If this file is shared by itself, use the contract at `docs/handoff/API_CONTRACT.md` in the team repository.
+
+## Colors
+
+| Role | Hex | Use |
+| --- | --- | --- |
+| Burnt orange | `#B54718` | Primary buttons with white text, links, focus indications, and milestone fills |
+| Orange pressed | `#943710` | Active or pressed primary buttons |
+| Dusty Mauve Pink | `#B78391` | Brand mark and decorative accents |
+| Light mauve | `#F3E6E8` | Quiet information panels, selected surfaces, and secondary balances |
+| Deep Mauve Charcoal | `#503C44` | Main text and the dark balance surface, with white text on that surface |
+| Muted text | `#6F555F` | Descriptions, hint text, and non-primary transaction information |
+| Canvas and surface | `#FBF7F2`, `#FFFFFF` | Warm app background and white inputs or panels |
+| Divider and control border | `#DDCBD0`, `#987582` | Row dividers and interactive outlines respectively |
+| Success | `#315D47` on `#EDF5EF` | Confirmation and successful settlement |
+| Error | `#982D3D` | Invalid credentials or failed actions |
+| Information | `#534767` on `#F1EDF5` | Ended offers and informational notices |
+
+Pair status colors with Arabic text. Keep solid Dusty Mauve Pink for accents and use the light tint for panels that carry text.
+
+## Typography
+
+Use **IBM Plex Sans Arabic** throughout. The current web frontend loads **400**, **600**, and **700** locally. Use the same three native font files on Android and load them through `expo-font`. The web package uses CSS and WebFonts. Expo should load the native font files from the official IBM package. [IBM Plex Sans Arabic](https://github.com/IBM/plex/tree/master/packages/plex-sans-arabic) · [Expo font setup](https://docs.expo.dev/develop/user-interface/fonts/)
+
+| Role | Web reference | Suggested Android starting point |
+| --- | --- | --- |
+| Display | Large, responsive public homepage and offer headlines, weight 700 | Screen titles at 28/38, weight 700 |
+| Section title | 20–24 px, weight 700 | 20/28, weight 700 |
+| Body | 16 px on standard screens, weight 400 | 16/26, weight 400 |
+| Field label and action | 14–16 px, weight 600 | 14/22 for labels and 16/24 for actions, weight 600 |
+| Balance | 24–36 px by prominence and viewport, weight 700 | 32/42 for the main balance, weight 700 |
+
+The Android numbers are font size and line height in React Native layout units. Use the matching loaded family for each weight. Keep system text scaling enabled and let long Arabic titles wrap. Format money with Arabic-friendly grouping and `ل.س.`, without changing amounts returned by the API. Keep phone numbers, codes, and raw URLs in LTR order within the RTL layout.
+
+## Layout
+
+- Use Arabic for visible copy, labels, accessible names, and errors. Enable RTL in Expo and check it on the actual Android build. Use logical start/end spacing for alignment. [React Native RTL guidance](https://reactnative.dev/docs/i18nmanager)
+- Use a single scrollable column on phones, with a 16-unit gutter and safe area space. Use about 8 units between an input and its label or between closely related items, and 24 units between sections.
+- Use at least 48 × 48 units for Android touch targets. Web inputs are 48 px high and main web actions have a minimum height of 44 px.
+- Put the screen title and primary action in predictable positions. Keep price, commission, availability, and date readable at narrow widths and larger system text sizes.
+
+## Elevation & Depth
+
+Build with warm canvas, white surfaces, and thin dividers. Use Deep Mauve Charcoal to give the most important balance more visual weight. Keep lists flat and readable.
+
+## Shapes
+
+Use 8-unit corners for controls and 12-unit corners for panels and image frames. Use a visible control outline on text inputs and secondary buttons. Keep campaign images consistent in crop and use the light mauve store fallback for missing merchant photos.
+
+## Components
+
+| Surface | Direction for Expo |
+| --- | --- |
+| Sign-in | Stack labeled phone and password fields, then one orange action, **تسجيل الدخول**. Keep errors next to the field or action. Use the seeded marketer account through `POST /auth/login` and keep credentials in secure device storage. |
+| Campaign list and details | Use an image or store fallback, then product and shop names, final price, marketer commission, and expiry. Read campaign values from `GET /campaigns` and `GET /campaigns/{campaignId}`. Use Arabic text for active and ended states. |
+| Join and share | Show **الانضمام إلى الحملة** on an eligible campaign. After joining through `POST /marketer/campaigns/{campaignId}/join`, show **مشاركة العرض** when the API returns a `referralUrl`. Share that exact public URL using the platform share sheet. |
+| Commission balance | Use a dark mauve panel with a clear label such as **الرصيد المتاح** and a large white amount. Read `availableBalanceSyp` from `GET /marketer/wallet` and refresh after settlement. Keep pending payouts visually separate when that feature ships. |
+| Loading, empty, and error states | Keep the page title and layout stable. Show **لا توجد حملات نشطة حالياً** for an empty list and a clear retry action when loading fails. Disable duplicate join submissions while pending. |
+
+## Do's and Don'ts
+
+- Use the same colors and typography on both platforms, with controls sized for touch on Android.
+- Use API values for prices, commission, statuses, links, and balances. Keep the mock seed and example figures out of production UI copy.
+- Keep the Expo demo focused on sign-in, browse, join, share, and commission. Wallet history, payout receipt flows, statistics, and the leaderboard are backlog.
+- Check the Android flow at a small phone width and with larger system text. From the device, join a campaign, share the link, open the web offer, then verify that the commission changes in Expo after the merchant scan.
+
