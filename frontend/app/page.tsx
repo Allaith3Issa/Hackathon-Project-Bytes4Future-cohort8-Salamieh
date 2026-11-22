@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Image from "next/image";
-import { sessionTokens } from "@/lib/session";
+import { getAccount } from "@/lib/session";
 
 const steps = [
   { title: "افتح رابط العرض", detail: "اطّلع على تفاصيل المنتج وسعره قبل زيارة المتجر." },
@@ -9,7 +9,12 @@ const steps = [
 ];
 
 export default async function Home() {
-  const { accessToken } = await sessionTokens();
+  const account = await getAccount().catch(() => null);
+  const roles = account?.roles ?? [];
+  const primaryAction = roles.includes("customer") ? { href: "/customer", label: "عرض الكاش باك" }
+    : roles.includes("merchant") ? { href: "/merchant/campaigns", label: "لوحة التاجر" }
+    : roles.includes("admin") ? { href: "/admin/topups", label: "الإدارة" }
+    : { href: "/login", label: "تسجيل الدخول" };
   return (
     <>
       <section className="page-wrap grid items-center gap-6 py-8 sm:gap-10 sm:py-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:py-16">
@@ -21,8 +26,8 @@ export default async function Home() {
             افتح رابط العرض، وأبرز بطاقة الخصم عند الدفع نقداً. تابع الكاش باك من حسابك بعد تسجيل الشراء.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 sm:mt-7">
-            <Link href={accessToken ? "/customer" : "/login"} className="button-primary">
-              {accessToken ? "عرض الكاش باك" : "تسجيل الدخول"}
+            <Link href={primaryAction.href} className="button-primary">
+              {primaryAction.label}
             </Link>
             <a href="#how-it-works" className="text-link inline-flex min-h-11 items-center">كيف تستخدم العرض؟</a>
           </div>

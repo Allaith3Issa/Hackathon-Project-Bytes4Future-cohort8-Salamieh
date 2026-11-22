@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import type { AuthSession } from "@/lib/contract";
@@ -68,6 +69,7 @@ export async function topUp(_state: TopupState, data: FormData): Promise<TopupSt
       `/admin/merchants/${encodeURIComponent(merchantId)}/topups`,
       { method: "POST", idempotencyKey: key, body: { amountSyp: amount, paymentMethod: method, referenceNote: note } },
     );
+    revalidatePath("/admin/topups");
     return { result };
   } catch (error) {
     return { error: staffError(error) };
@@ -75,10 +77,17 @@ export async function topUp(_state: TopupState, data: FormData): Promise<TopupSt
 }
 
 /* ---------- merchant campaigns ---------- */
-export interface CampaignState { preview?: CampaignPreview; error?: string; errors?: Record<string, string> }
+export interface CampaignState {
+  preview?: { key: string; values: CampaignPreview };
+  error?: string;
+  errors?: Record<string, string>;
+}
 
-export async function campaignAction(_state: CampaignState, data: FormData): Promise<CampaignState> {
+export async function campaignAction(state: CampaignState, data: FormData): Promise<CampaignState> {
   const launch = text(data, "intent") === "launch";
+  const key = text(data, "key");
+  if (!uuid.test(key)) return { error: KEY_ERROR };
+  const preview = state.preview?.key === key ? state.preview : undefined;
   const price = syp(text(data, "originalPriceSyp"));
   const commission = syp(text(data, "commissionSyp"));
   const maxItems = syp(text(data, "maxItems"));
@@ -100,24 +109,23 @@ export async function campaignAction(_state: CampaignState, data: FormData): Pro
     if (!/^https?:\/\/\S+$/i.test(imageUrl)) errors.imageUrl = "أدخل رابط صورة يبدأ بـ http أو https.";
     if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= Date.now()) errors.endsAt = "اختر موعد انتهاء في المستقبل.";
   }
-  if (Object.keys(errors).length) return { errors };
+  if (Object.keys(errors).length) return { preview, errors };
   const base = {
     campaignType: "product", originalPriceSyp: price, discountPercent: discount,
     commission: { type: "fixed", amountSyp: commission }, maxItems,
   };
   try {
     if (!launch) {
-      return { preview: await authenticatedRequest<CampaignPreview>("/merchant/campaigns/preview", { method: "POST", body: base }) };
+      const values = await authenticatedRequest<CampaignPreview>("/merchant/campaigns/preview", { method: "POST", body: base });
+      return { preview: { key, values } };
     }
-    const key = text(data, "key");
-    if (!uuid.test(key)) return { error: KEY_ERROR };
     const campaign = await authenticatedRequest<MerchantCampaign>("/merchant/campaigns", {
       method: "POST", idempotencyKey: key,
       body: { ...base, productName, description, imageUrl, endsAt: endsAt!.toISOString(), joinMode: "open" },
     });
     redirect(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
   } catch (error) {
-    if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { error: staffError(error) };
+    if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error) };
     throw error; // let Next.js redirect propagate
   }
 }
@@ -125,8 +133,11 @@ export async function campaignAction(_state: CampaignState, data: FormData): Pro
 export interface CloseState { campaign?: MerchantCampaign; error?: string }
 
 export async function closeCampaign(id: string, _state: CloseState): Promise<CloseState> {
+  const path = `/merchant/campaigns/${encodeURIComponent(id)}` as const;
   try {
-    return { campaign: await authenticatedRequest<MerchantCampaign>(`/merchant/campaigns/${encodeURIComponent(id)}/close`, { method: "POST" }) };
+    const campaign = await authenticatedRequest<MerchantCampaign>(`${path}/close`, { method: "POST" });
+    revalidatePath(path);
+    return { campaign };
   } catch (error) {
     return { error: staffError(error) };
   }
