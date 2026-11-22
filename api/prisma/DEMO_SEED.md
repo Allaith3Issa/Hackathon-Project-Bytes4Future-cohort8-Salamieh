@@ -1,6 +1,6 @@
 # Local demo seed
 
-Use a dedicated local PostgreSQL database, such as `affiliate_marketing_demo`. The seed accepts loopback addresses `127.0.0.1` and `::1` and database names starting with `affiliate_marketing_demo` or `affiliate_marketing_seed_test`, with optional underscore-separated suffixes. It rejects the database named by the normal `DATABASE_URL`. The seed is available only with `NODE_ENV=development` or `NODE_ENV=test`.
+By default, use a dedicated local PostgreSQL database, such as `affiliate_marketing_demo`. The seed accepts loopback hosts and database names starting with `affiliate_marketing_demo` or `affiliate_marketing_seed_test`, with optional underscore-separated suffixes. This mode rejects the database named by `DATABASE_URL` and requires `NODE_ENV=development` or `NODE_ENV=test`.
 
 From `api/`, run `npx --no prisma migrate deploy` with a process-scoped `DATABASE_URL` pointed at the dedicated database. Then restore the normal `DATABASE_URL` or use a new shell. For seeding, set `DEMO_SEED_DATABASE_URL` to the dedicated database URL without query options. Set distinct `DEMO_ADMIN_PASSWORD` and `DEMO_ACCOUNT_PASSWORD` values of at least 12 characters and at most 72 UTF-8 bytes privately in the environment or ignored `.env`. The second password applies to all six non-admin accounts.
 
@@ -10,6 +10,18 @@ npm run db:seed
 ```
 
 The first run creates both fixtures in one transaction. Later runs leave the fixtures as they are, including any subsequent top-ups, sales, status changes, expiry dates, and credentials. A conflicting identifier on first run aborts the transaction. Use a fresh dedicated database to start a new rehearsal from the initial state.
+
+## Opt in to local development seeding
+
+For local Swagger testing, `DATABASE_URL` must identify the loopback `affiliate_marketing_dev` database. Apply the existing migrations, set the two demo passwords privately, and opt in for this invocation.
+
+```powershell
+$env:NODE_ENV = 'development'
+$env:ALLOW_DEV_DEMO_SEED = '1'
+try { npm run db:seed } finally { Remove-Item Env:ALLOW_DEV_DEMO_SEED }
+```
+
+This mode uses `DATABASE_URL`. The first run requires empty application tables. A rerun verifies the seed marker and expected account identities, then leaves their credentials, balances, and activity intact.
 
 ## Accounts and fixtures
 

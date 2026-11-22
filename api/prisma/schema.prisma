@@ -15,6 +15,7 @@ enum MerchantVerificationStatus {
   verified
   rejected
 
+
   @@map("merchant_verification_status")
 }
 
