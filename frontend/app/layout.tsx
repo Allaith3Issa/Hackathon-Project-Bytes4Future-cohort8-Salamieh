@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import "@fontsource/ibm-plex-sans-arabic/400.css";
 import "@fontsource/ibm-plex-sans-arabic/600.css";
@@ -6,11 +7,15 @@ import "@fontsource/ibm-plex-sans-arabic/700.css";
 import { signOut } from "@/app/actions";
 import { SessionRefresh } from "@/components/session-refresh";
 import { sessionTokens } from "@/lib/session";
+import mardoodLogo from "../public/brand/mardood-logo.png";
 import "./globals.css";
 
+const brandName = "مردود";
+
 export const metadata: Metadata = {
-  title: { default: "عروض السلمية", template: "%s | عروض السلمية" },
+  title: { default: brandName, template: `%s | ${brandName}` },
   description: "عروض من متاجر السلمية تستخدمها عند الدفع نقداً في المتجر.",
+  icons: { icon: { url: "/brand/mardood-symbol.png", type: "image/png", sizes: "512x512" } },
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -24,9 +29,8 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         </a>
         <header className="border-b border-rule bg-white">
           <div className="page-wrap flex min-h-18 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
-            <Link href="/" className="inline-flex min-h-11 items-center gap-2.5 text-base font-bold sm:text-lg">
-              <span className="brand-mark" aria-hidden="true">س</span>
-              عروض السلمية
+            <Link href="/" aria-label={`${brandName}، الصفحة الرئيسية`} className="inline-flex min-h-11 shrink-0 items-center">
+              <Image src={mardoodLogo} alt="" sizes="(min-width: 640px) 144px, 112px" className="h-auto w-28 sm:w-36" />
             </Link>
             <nav aria-label="التنقل الرئيسي" className="flex flex-wrap items-center gap-2 text-sm sm:gap-4 sm:text-base">
               {accessToken ? (

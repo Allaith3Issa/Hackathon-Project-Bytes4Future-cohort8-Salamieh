@@ -8,7 +8,7 @@ Use burnt orange `#B54718` for primary actions, Dusty Mauve Pink `#B78391` for t
 
 ## References reviewed
 
-| Site | Pattern adapted for عروض السلمية |
+| Site | Pattern adapted for Mardood |
 | --- | --- |
 | [Shopify Collabs](https://www.shopify.com/collabs/creators) | Lead with the audience’s task and put sign-in within reach. |
 | [impact.com](https://impact.com/affiliate-marketing/) | Keep attribution and transaction information distinct from promotional copy. |
