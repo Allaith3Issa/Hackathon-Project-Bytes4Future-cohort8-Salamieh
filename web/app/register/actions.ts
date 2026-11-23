@@ -3,9 +3,10 @@
 import { redirect } from "next/navigation";
 import { apiRequest, ApiError } from "@/lib/api";
 import type { AuthSession } from "@/lib/contract";
+import { publicAccountDestination } from "@/lib/public-account-destination";
 import { validateRegistration, type RegistrationErrors } from "@/lib/registration";
 import { saveSession } from "@/lib/session";
-import { errorMessage, validReferral } from "@/lib/ui";
+import { errorMessage } from "@/lib/ui";
 
 export async function signUp(offer: string | undefined, _state: RegistrationErrors, data: FormData): Promise<RegistrationErrors> {
   const { body, errors } = validateRegistration(data);
@@ -38,8 +39,5 @@ export async function signUp(offer: string | undefined, _state: RegistrationErro
     return { error: errorMessage(error) };
   }
 
-  if (body.roles.includes("customer")) {
-    redirect(typeof offer === "string" && validReferral(offer) ? `/r/${offer}` : "/customer");
-  }
-  redirect(body.roles.includes("merchant") ? "/merchant/campaigns" : "/");
+  redirect(publicAccountDestination(body.roles, offer) ?? "/");
 }
