@@ -18,6 +18,7 @@ const accounts = [
 const fixtureId = (key: number) => `aff111a7-e000-4000-8000-${String(key).padStart(12, '0')}`;
 const adminId = fixtureId(1);
 const marker = { actorId: adminId, operation: 'demo.seed.v1', requestKey: fixtureId(90) };
+// Money literals are hundredths of a new SYP. The historical fixture integers carry over unchanged.
 const reserve = 435_000n;
 const developmentDatabaseName = 'affiliate_marketing_dev';
 

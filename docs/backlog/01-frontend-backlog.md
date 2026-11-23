@@ -15,7 +15,7 @@ Start backlog implementation after the [live Android and web rehearsal and backe
 
 Build both screens from the contract examples while Laith implements the endpoints. Test the two screens together once the API is ready.
 
-**Acceptance check:** Issue a **5,000 SYP** voucher and redeem it on a **20,000 SYP** bill. The merchant receives **5,000 SYP** and the screen shows **15,000 SYP cash due**. Confirm that cancelling an unused voucher restores the available balance.
+**Acceptance check:** Issue a **50.00 new SYP** voucher and redeem it on a **200.00 new SYP** bill. The merchant receives **50.00 new SYP** and the screen shows **150.00 new SYP cash due**. Confirm that cancelling an unused voucher restores the available balance.
 
 ## Alaa · Remaining tasks
 
