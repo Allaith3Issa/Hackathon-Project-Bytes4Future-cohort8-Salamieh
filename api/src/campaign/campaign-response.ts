@@ -1,10 +1,37 @@
 import { toMoneyJsonInteger } from '../common/money';
 import type { Prisma } from '../generated/prisma/client';
-import type { MerchantCampaignDto } from './campaign.dto';
+import type { CampaignDto, MerchantCampaignDto } from './campaign.dto';
 import { calculateSalePricing, discountedPrice, percentToBasisPoints } from './campaign-pricing';
 
 export const campaignMerchant = { merchant: { select: { shopName: true } } } as const;
-type CampaignRecord = Prisma.CampaignGetPayload<{ include: typeof campaignMerchant }>;
+export type CampaignRecord = Prisma.CampaignGetPayload<{ include: typeof campaignMerchant }>;
+
+export function campaignConversionRate(itemsSold: number, clicks: number): number {
+  if (clicks === 0) return 0;
+  const count = BigInt(clicks);
+  return Number((BigInt(itemsSold) * 10000n + count / 2n) / count) / 100;
+}
+
+export function mapCampaign(campaign: CampaignRecord): CampaignDto {
+  const discountPercent = campaign.discountPercent.toNumber();
+  const commission = campaign.commissionType === 'fixed'
+    ? { type: 'fixed' as const, amountSyp: BigInt(campaign.commissionValue.toFixed(0)) }
+    : { type: 'percentage' as const, basisPoints: percentToBasisPoints(campaign.commissionValue.toNumber()) };
+  const originalPrice = campaign.campaignType === 'product' ? campaign.originalPriceSyp : null;
+  const finalPrice = originalPrice === null ? null : discountedPrice(originalPrice, percentToBasisPoints(discountPercent));
+
+  return {
+    id: campaign.id, campaignType: campaign.campaignType, shopName: campaign.merchant.shopName,
+    productName: campaign.productName, description: campaign.description, imageUrl: campaign.imageUrl,
+    originalPriceSyp: originalPrice === null ? null : toMoneyJsonInteger(originalPrice), discountPercent,
+    finalPriceSyp: finalPrice === null ? null : toMoneyJsonInteger(finalPrice),
+    commission: commission.type === 'fixed'
+      ? { type: 'fixed', amountSyp: toMoneyJsonInteger(commission.amountSyp) }
+      : { type: 'percentage', percent: campaign.commissionValue.toNumber() },
+    commissionPerItemSyp: finalPrice === null ? null : toMoneyJsonInteger(calculateSalePricing(finalPrice, commission, 1).marketerCommissionSyp),
+    joinMode: campaign.joinMode, status: campaign.status, endsAt: campaign.endsAt.toISOString(),
+  };
+}
 
 export async function mapMerchantCampaigns(tx: Prisma.TransactionClient, campaigns: CampaignRecord[]): Promise<MerchantCampaignDto[]> {
   if (campaigns.length === 0) return [];
@@ -27,26 +54,10 @@ export async function mapMerchantCampaigns(tx: Prisma.TransactionClient, campaig
     const grossCashSalesSyp = toMoneyJsonInteger(salesVolume);
     const commissionPaidSyp = toMoneyJsonInteger(salesTotals?._sum.marketerCommissionSyp ?? 0n);
     const platformFeesPaidSyp = toMoneyJsonInteger(salesTotals?._sum.platformTotalFeeSyp ?? 0n);
-    const discountPercent = campaign.discountPercent.toNumber();
-    const commission = campaign.commissionType === 'fixed'
-      ? { type: 'fixed' as const, amountSyp: BigInt(campaign.commissionValue.toFixed(0)) }
-      : { type: 'percentage' as const, basisPoints: percentToBasisPoints(campaign.commissionValue.toNumber()) };
-    const originalPrice = campaign.campaignType === 'product' ? campaign.originalPriceSyp : null;
-    const finalPrice = originalPrice === null ? null : discountedPrice(originalPrice, percentToBasisPoints(discountPercent));
     const volumeLeft = campaign.maxSalesVolumeSyp === null ? null : campaign.maxSalesVolumeSyp - salesVolume;
-    const count = BigInt(clicks);
-    const conversionRatePercent = clicks === 0 ? 0 : Number((BigInt(itemsSold) * 10000n + count / 2n) / count) / 100;
 
     return {
-      id: campaign.id, campaignType: campaign.campaignType, shopName: campaign.merchant.shopName,
-      productName: campaign.productName, description: campaign.description, imageUrl: campaign.imageUrl,
-      originalPriceSyp: originalPrice === null ? null : toMoneyJsonInteger(originalPrice), discountPercent,
-      finalPriceSyp: finalPrice === null ? null : toMoneyJsonInteger(finalPrice),
-      commission: commission.type === 'fixed'
-        ? { type: 'fixed', amountSyp: toMoneyJsonInteger(commission.amountSyp) }
-        : { type: 'percentage', percent: campaign.commissionValue.toNumber() },
-      commissionPerItemSyp: finalPrice === null ? null : toMoneyJsonInteger(calculateSalePricing(finalPrice, commission, 1).marketerCommissionSyp),
-      joinMode: campaign.joinMode, status: campaign.status, endsAt: campaign.endsAt.toISOString(), directReferralUrl: null,
+      ...mapCampaign(campaign), directReferralUrl: null,
       usage: {
         maxItems: campaign.maxItems, itemsSold,
         itemsLeft: campaign.maxItems === null ? null : Math.max(0, campaign.maxItems - itemsSold),
@@ -57,7 +68,7 @@ export async function mapMerchantCampaigns(tx: Prisma.TransactionClient, campaig
         lockedBudgetSyp: toMoneyJsonInteger(campaign.lockedBudgetSyp), commissionsPaidSyp: commissionPaidSyp, platformFeesPaidSyp,
       },
       stats: { clicks, salesCount: salesTotals?._count._all ?? 0, itemsSold,
-        grossCashSalesSyp, commissionPaidSyp, platformFeesPaidSyp, conversionRatePercent },
+        grossCashSalesSyp, commissionPaidSyp, platformFeesPaidSyp, conversionRatePercent: campaignConversionRate(itemsSold, clicks) },
     };
   });
 }

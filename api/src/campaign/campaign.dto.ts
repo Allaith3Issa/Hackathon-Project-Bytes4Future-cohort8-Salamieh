@@ -43,7 +43,7 @@ export class LaunchCampaignDto extends CampaignPreviewInputDto {
 const parseQueryInteger = ({ value }: { value: unknown }) =>
   typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : value;
 
-export class MerchantCampaignQueryDto {
+export class CampaignPageQueryDto {
   @ApiPropertyOptional({ type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER, default: 1 })
   @Transform(parseQueryInteger)
   @IsInt()
@@ -57,7 +57,9 @@ export class MerchantCampaignQueryDto {
   @Min(1)
   @Max(100)
   pageSize = 20;
+}
 
+export class MerchantCampaignQueryDto extends CampaignPageQueryDto {
   @ApiPropertyOptional({ enum: statuses })
   @IsOptional()
   @IsIn(statuses)
@@ -120,7 +122,7 @@ class MerchantCampaignStatsDto {
   conversionRatePercent!: number;
 }
 
-export class MerchantCampaignDto {
+export class CampaignDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
   @ApiProperty({ enum: ['product', 'store_discount'] })
@@ -149,6 +151,9 @@ export class MerchantCampaignDto {
   status!: (typeof statuses)[number];
   @ApiProperty({ format: 'date-time' })
   endsAt!: string;
+}
+
+export class MerchantCampaignDto extends CampaignDto {
   @ApiProperty({ type: String, nullable: true })
   directReferralUrl!: string | null;
   @ApiProperty({ type: CampaignUsageDto })
@@ -157,9 +162,7 @@ export class MerchantCampaignDto {
   stats!: MerchantCampaignStatsDto;
 }
 
-export class MerchantCampaignPageDto {
-  @ApiProperty({ type: [MerchantCampaignDto] })
-  items!: MerchantCampaignDto[];
+export class CampaignPageDto {
   @ApiProperty({ ...count, minimum: 1 })
   page!: number;
   @ApiProperty({ ...count, minimum: 1, maximum: 100 })
@@ -170,4 +173,9 @@ export class MerchantCampaignPageDto {
   previousPage!: number | null;
   @ApiProperty({ ...count, minimum: 1, nullable: true })
   nextPage!: number | null;
+}
+
+export class MerchantCampaignPageDto extends CampaignPageDto {
+  @ApiProperty({ type: [MerchantCampaignDto] })
+  items!: MerchantCampaignDto[];
 }
