@@ -57,8 +57,7 @@ export function OfferPass({ code }: { code: string }) {
       </div>
       <div className="px-5 py-4 sm:px-6">
         {image ? (
-          // The generated PNG preserves the QR code's quiet zone.
-          // eslint-disable-next-line @next/next/no-img-element
+       
           <img src={image} width={256} height={256} alt="رمز مسح بطاقة الخصم" className="mx-auto mb-4 h-auto max-w-full" />
         ) : <p className="notice mb-4">أعطِ التاجر الرمز اليدوي أدناه لإدخاله عند الدفع.</p>}
         <label htmlFor="pass-code" className="block">رمز الإدخال اليدوي</label>

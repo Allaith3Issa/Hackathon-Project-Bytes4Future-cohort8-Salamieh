@@ -24,7 +24,7 @@ export async function staffSignIn(
 ): Promise<StaffSignInState> {
   const phone = digits(text(data, "phone"));
   const password = String(data.get("password") ?? "");
-  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من ١٠ أرقام يبدأ بـ 09.";
+  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من 10 أرقام يبدأ بـ 09.";
   const passwordError = password ? undefined : "أدخل كلمة المرور.";
   if (phoneError || passwordError) return { phoneError, passwordError };
   try {
@@ -96,7 +96,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
   const description = text(data, "description");
   const imageUrl = text(data, "imageUrl");
   const endsRaw = text(data, "endsAt");
-  const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; // Damascus is UTC+3
+  const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; 
   if (launch) {
     if (!productName) errors.productName = "أدخل اسم المنتج.";
     if (!description) errors.description = "أدخل وصفاً للمنتج.";

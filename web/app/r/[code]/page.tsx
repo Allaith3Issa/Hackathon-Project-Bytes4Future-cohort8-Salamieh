@@ -76,8 +76,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
         </div>
         <div className="overflow-hidden rounded-xl bg-mauve lg:col-start-2 lg:row-start-1 lg:row-span-2">
           {image ? (
-            // Merchant-provided image URLs are rendered directly without a server-side image proxy.
-            // eslint-disable-next-line @next/next/no-img-element
+           
             <img src={image} alt={offer.productName} referrerPolicy="no-referrer" className="aspect-[4/3] max-h-[50vh] w-full object-cover lg:aspect-[5/4] lg:max-h-none" />
           ) : (
             <div className="px-5 py-4 sm:px-7 lg:grid lg:min-h-40 lg:content-center lg:gap-2 lg:px-8">
