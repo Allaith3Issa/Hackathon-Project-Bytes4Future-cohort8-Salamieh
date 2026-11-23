@@ -1,21 +1,39 @@
-import { Body, Controller, Header, Headers, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import { applyDecorators, Body, Controller, Get, Header, Headers, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthErrorDto, AuthSessionDto } from './auth-session.dto';
+import { requireRequestAuth, type RequestWithAuth } from './authenticated-actor';
+import { AccountDto, AuthErrorDto, AuthSessionDto } from './auth-session.dto';
 import { AuthService } from './auth.service';
+import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './login.dto';
 import { LoginThrottlerGuard } from './login-throttler.guard';
 import { LogoutDto, RefreshDto } from './session-token.dto';
 
+const ThrottleAuth = () => applyDecorators(
+  UseGuards(LoginThrottlerGuard),
+  ApiResponse({ status: 429, type: AuthErrorDto, description: 'RATE_LIMITED' }),
+);
+
 @ApiTags('Authentication')
 @ApiResponse({ status: 400, type: AuthErrorDto, description: 'VALIDATION_ERROR' })
-@ApiResponse({ status: 429, type: AuthErrorDto, description: 'RATE_LIMITED' })
 @ApiResponse({ status: 500, type: AuthErrorDto, description: 'INTERNAL_ERROR' })
-@UseGuards(LoginThrottlerGuard)
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
+  @Get('me')
+  @Header('Cache-Control', 'no-store')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the current authenticated account' })
+  @ApiOkResponse({ type: AccountDto })
+  @ApiResponse({ status: 401, type: AuthErrorDto, description: 'AUTH_REQUIRED or SESSION_EXPIRED' })
+  @ApiResponse({ status: 403, type: AuthErrorDto, description: 'FORBIDDEN under a role policy. This endpoint accepts all authenticated roles.' })
+  me(@Req() request: RequestWithAuth): AccountDto {
+    return requireRequestAuth(request).account;
+  }
+
   @Post('login')
+  @ThrottleAuth()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Sign in to a public account' })
@@ -27,6 +45,7 @@ export class AuthController {
   }
 
   @Post('admin/login')
+  @ThrottleAuth()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Sign in to an administrator account' })
@@ -38,6 +57,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @ThrottleAuth()
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Rotate an active session’s refresh token' })
@@ -49,6 +69,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @ThrottleAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @Header('Cache-Control', 'no-store')
   @ApiOperation({ summary: 'Revoke the session identified by the access token' })

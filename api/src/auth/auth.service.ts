@@ -5,13 +5,14 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { RequestWithAuth } from './authenticated-actor';
 import { ACCESS_TOKEN_SECONDS, AccountDto, AuthSessionDto, Role } from './auth-session.dto';
 import { LoginDto } from './login.dto';
 
 const SESSION_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000;
 const BCRYPT_HASH = /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/;
 const accountRelations = { merchantProfile: true, customerProfile: true } as const;
-type AccountRecord = Prisma.UserGetPayload<{ include: typeof accountRelations }>;
+type AccountRecord = Prisma.UserGetPayload<{ include: typeof accountRelations; omit: { passwordHash: true } }>;
 type SessionTimes = { expiresAt: Date; lastActivityAt: Date };
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
@@ -86,6 +87,31 @@ export class AuthService implements OnModuleInit {
 
   async onModuleInit() {
     this.dummyHash = await bcrypt.hash(randomBytes(32), 10);
+  }
+
+  async authenticate(authorization?: string): Promise<NonNullable<RequestWithAuth['auth']>> {
+    try {
+      const { sub, sid } = await this.verifyAccessToken(authorization);
+      const session = await this.prisma.getClient().userSession.findUnique({
+        where: { id: sid },
+        select: {
+          userId: true,
+          lastActivityAt: true,
+          expiresAt: true,
+          revokedAt: true,
+          user: { include: accountRelations, omit: { passwordHash: true } },
+        },
+      });
+      if (!session || session.userId !== sub || !session.user) throw unauthorized('AUTH_REQUIRED');
+      if (session.revokedAt || isExpired(session, new Date())) throw unauthorized('SESSION_EXPIRED');
+
+      // Auth checks and polling are read-only. Future intentional user actions should
+      // update lastActivityAt in their service transaction without extending expiresAt.
+      const account = mapAccount(session.user);
+      return { actor: { userId: sub, sessionId: sid, roles: account.roles }, account };
+    } catch (error) {
+      return authFailure(error, 'Unable to verify the session.');
+    }
   }
 
   async login(input: LoginDto, adminLogin: boolean): Promise<AuthSessionDto> {

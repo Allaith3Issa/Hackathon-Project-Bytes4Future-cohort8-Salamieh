@@ -1,11 +1,32 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { createHash, randomBytes } = require('node:crypto');
+const { createHash, randomBytes, randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
 const { JwtService } = require('@nestjs/jwt');
 const bcrypt = require('bcrypt');
 
 const databaseUrl = process.env.AUTH_INTEGRATION_DATABASE_URL;
+
+test('RolesGuard requires an authenticated actor and allows any declared role', () => {
+  const { Reflector } = require('@nestjs/core');
+  const { Roles, RolesGuard } = require('../dist/auth/roles.guard');
+  class RoleRoute {}
+  Roles('admin')(RoleRoute);
+  const handler = () => {};
+  Roles('merchant', 'marketer')(handler);
+  const request = {};
+  const context = {
+    switchToHttp: () => ({ getRequest: () => request }),
+    getHandler: () => handler,
+    getClass: () => RoleRoute,
+  };
+  const guard = new RolesGuard(new Reflector());
+  assert.throws(() => guard.canActivate(context), (e) => e.getStatus() === 401 && e.getResponse().code === 'AUTH_REQUIRED');
+  request.auth = { actor: { userId: randomUUID(), sessionId: randomUUID(), roles: ['customer'] } };
+  assert.throws(() => guard.canActivate(context), (e) => e.getStatus() === 403 && e.getResponse().code === 'FORBIDDEN');
+  request.auth.actor.roles = ['customer', 'marketer'];
+  assert.equal(guard.canActivate(context), true);
+});
 
 test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl }, async (t) => {
   const url = new URL(databaseUrl);
@@ -20,6 +41,8 @@ test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl },
   process.env.JWT_SECRET = secret;
   process.env.DATABASE_URL = databaseUrl;
   const { createApp } = require('../dist/main');
+  const { AuthService } = require('../dist/auth/auth.service');
+  const { Roles, RolesGuard } = require('../dist/auth/roles.guard');
   const { PrismaService } = require('../dist/prisma/prisma.service');
   const app = await createApp({ logger: false });
   t.after(() => app.close());
@@ -55,11 +78,100 @@ test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl },
     assert.equal((await response.json()).code, code);
   };
   const readSession = (id) => client.userSession.findUniqueOrThrow({ where: { id } });
+  const me = (authorization) => fetch(`${base}/api/v1/auth/me`, {
+    headers: authorization === undefined ? {} : { authorization },
+  });
 
   const original = await login(first);
   const originalClaims = await verify(original.accessToken);
   const initial = await readSession(originalClaims.sid);
   let current;
+
+  await t.test('me returns the database account without changing activity', async () => {
+    const response = await me(`Bearer ${original.accessToken}`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.deepEqual(await response.json(), original.user);
+    assert.deepEqual(await readSession(initial.id), initial);
+  });
+
+  await t.test('me rejects missing, invalid or mismatched JWTs and sessions', async () => {
+    const claims = { sub: first.id, sid: initial.id };
+    const validOptions = { secret, algorithm: 'HS256', expiresIn: 900 };
+    const sign = (payload, options = {}) => jwt.signAsync(payload, { ...validOptions, ...options });
+    await expectError(await me(), 'AUTH_REQUIRED');
+    await expectError(await me('Basic abc'), 'AUTH_REQUIRED');
+    await expectError(await me('Bearer invalid'), 'AUTH_REQUIRED');
+    const invalidTokens = await Promise.all([
+      sign(claims, { secret: randomBytes(32) }),
+      sign(claims, { expiresIn: -1 }),
+      sign(claims, { algorithm: 'HS384' }),
+      sign({ sub: first.id }),
+      sign({ sid: initial.id }),
+      jwt.signAsync(claims, { secret, algorithm: 'HS256' }),
+      sign({ sub: second.id, sid: initial.id }),
+      sign({ sub: first.id, sid: randomUUID() }),
+    ]);
+    for (const token of invalidTokens) {
+      await expectError(await me(`Bearer ${token}`), 'AUTH_REQUIRED');
+    }
+  });
+
+  await t.test('role policies and Account mapping use current PostgreSQL state', async () => {
+    const auth = app.get(AuthService);
+    const guard = app.get(RolesGuard);
+    const authorization = `Bearer ${original.accessToken}`;
+    const check = (request, ...roles) => {
+      class ProtectedRoute {}
+      Roles(...roles)(ProtectedRoute);
+      return guard.canActivate({
+        switchToHttp: () => ({ getRequest: () => request }),
+        getHandler: () => check,
+        getClass: () => ProtectedRoute,
+      });
+    };
+    const request = { auth: await auth.authenticate(authorization) };
+    assert.deepEqual(Object.keys(request.auth.actor).sort(), ['roles', 'sessionId', 'userId']);
+    assert.equal(check(request, 'customer'), true);
+    for (const role of ['admin', 'merchant', 'marketer']) {
+      assert.throws(() => check(request, role), (e) => e.getStatus() === 403 && e.getResponse().code === 'FORBIDDEN');
+    }
+    await client.user.update({
+      where: { id: first.id },
+      data: {
+        isAdmin: true,
+        isMarketer: true,
+        merchantProfile: { create: { shopName: 'Integration shop', shopDetails: 'Profile details' } },
+        customerProfile: { create: { verifiedPurchaseCount: 1, availableCashbackSyp: 1800n } },
+      },
+    });
+    try {
+      request.auth = await auth.authenticate(authorization);
+      for (const role of ['admin', 'merchant', 'marketer', 'customer']) {
+        assert.equal(check(request, role), true);
+      }
+      const response = await me(authorization);
+      assert.equal(response.status, 200);
+      assert.deepEqual(await response.json(), {
+        ...original.user,
+        roles: ['admin', 'customer', 'marketer', 'merchant'],
+        merchant: { name: 'Integration shop', details: 'Profile details', verificationStatus: 'pending', contractReference: null },
+        customer: { verifiedPurchaseCount: 1, availableCashbackSyp: 1800, lockedCashbackSyp: 0 },
+      });
+      await client.user.update({ where: { id: first.id }, data: { isCustomer: false } });
+      request.auth = await auth.authenticate(authorization);
+      assert.throws(() => check(request, 'customer'), (e) => e.getStatus() === 403);
+      assert.equal(check(request, 'customer', 'merchant'), true);
+    } finally {
+      await client.user.update({
+        where: { id: first.id },
+        data: {
+          isAdmin: false, isCustomer: true, isMarketer: false,
+          merchantProfile: { delete: true }, customerProfile: { delete: true },
+        },
+      });
+    }
+  });
 
   await t.test('rotation returns AuthSession and leaves activity and expiry unchanged', async () => {
     const response = await refresh(original.refreshToken);
@@ -98,10 +210,12 @@ test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl },
     const expiryClaims = await verify(expired.accessToken);
     await client.userSession.update({ where: { id: expiryClaims.sid }, data: { expiresAt: new Date(Date.now() - 1000) } });
     await expectError(await refresh(expired.refreshToken), 'SESSION_EXPIRED');
+    await expectError(await me(`Bearer ${expired.accessToken}`), 'SESSION_EXPIRED');
     const inactive = await login(first);
     const inactiveClaims = await verify(inactive.accessToken);
     await client.userSession.update({ where: { id: inactiveClaims.sid }, data: { lastActivityAt: new Date(Date.now() - 31 * 86400000) } });
     await expectError(await refresh(inactive.refreshToken), 'SESSION_EXPIRED');
+    await expectError(await me(`Bearer ${inactive.accessToken}`), 'SESSION_EXPIRED');
   });
 
   await t.test('logout verifies the bearer, ownership and optional refresh token', async () => {
@@ -127,6 +241,7 @@ test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl },
     assert.equal(await repeat.text(), '');
     assert.deepEqual(await readSession(initial.id), revoked);
     await expectError(await refresh(current.refreshToken), 'REFRESH_TOKEN_INVALID');
+    await expectError(await me(`Bearer ${current.accessToken}`), 'SESSION_EXPIRED');
     assert.equal((await readSession((await verify(other.accessToken)).sid)).revokedAt, null);
   });
 
@@ -134,6 +249,12 @@ test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl },
     const response = await fetch(`${base}/api/docs-json`);
     assert.equal(response.status, 200);
     const { paths } = await response.json();
+    const meSpec = paths['/api/v1/auth/me'].get;
+    assert.deepEqual(meSpec.security, [{ bearer: [] }]);
+    assert.equal(meSpec.responses['200'].content['application/json'].schema.$ref, '#/components/schemas/AccountDto');
+    for (const status of ['401', '403']) {
+      assert.equal(meSpec.responses[status].content['application/json'].schema.$ref, '#/components/schemas/AuthErrorDto');
+    }
     const refreshSpec = paths['/api/v1/auth/refresh'].post;
     const logoutSpec = paths['/api/v1/auth/logout'].post;
     assert.equal(refreshSpec.requestBody.content['application/json'].schema.$ref, '#/components/schemas/RefreshDto');
