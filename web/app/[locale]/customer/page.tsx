@@ -30,7 +30,7 @@ export default async function CustomerPage({
       authenticatedRequest<Page<CustomerPurchase>>(`/customer/purchases?page=${purchasePage}`),
     ]);
   } catch (error) {
-    await expiredRedirect(error);
+    await expiredRedirect(error, "customer");
     return (
       <div className="page-wrap py-12">
         <h1 className="page-title">{t("common.cashback")}</h1>

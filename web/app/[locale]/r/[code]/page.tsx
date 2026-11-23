@@ -47,7 +47,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
   }
 
   const active = offer.status === "active";
-  const account = active ? await getAccount() : null;
+  const account = active ? await getAccount().catch(() => null) : null;
   const signedIn = account?.roles.includes("customer") ?? false;
   const image = offerImage(offer.imageUrl);
 
@@ -99,9 +99,9 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
             <section className="surface p-5 sm:p-6">
               <h2 className="text-lg font-bold sm:text-xl">{t("offers.signInToGetADiscount")}</h2>
               <div className="mt-4"><SignInForm offer={code} customerOnly /></div>
-              {account && <p className="mt-4 text-center text-sm leading-6 text-muted">
+              <p className="mt-4 text-center text-sm leading-6 text-muted">
                 {t("auth.needAnAccount")}{" "}<Link className="text-link" href={`/register?offer=${code}`}>{t("auth.createAccount")}</Link>
-              </p>}
+              </p>
             </section>
           )}
         </div>

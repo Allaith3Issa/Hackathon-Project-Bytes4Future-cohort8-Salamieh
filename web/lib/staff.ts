@@ -2,20 +2,23 @@ import "server-only";
 import { redirectLocalized } from "./i18n-server";
 import { ApiError } from "./api";
 import type { Role } from "./contract";
-import { requireAccount, requirePageAccount } from "./session";
+import { loginForRole } from "./route-access";
+import { getAccount, sessionTokens } from "./session";
 
 export async function requireRole(role: Role) {
-  const account = await requireAccount();
+  const account = await getAccount();
+  if (!account) return redirectLocalized(loginForRole(role));
   if (!account.roles.includes(role)) return redirectLocalized("/");
   return account;
 }
 
 export async function requirePageRole(role: Role) {
-  const account = await requirePageAccount();
-  if (account && !account.roles.includes(role)) return redirectLocalized("/");
-  return account;
+  const account = await getAccount();
+  if (account) return account.roles.includes(role) ? account : redirectLocalized("/");
+  if ((await sessionTokens()).refreshToken) return null;
+  return redirectLocalized(loginForRole(role));
 }
 
-export async function expiredRedirect(error: unknown) {
-  if (error instanceof ApiError && error.status === 401) return redirectLocalized("/login");
+export async function expiredRedirect(error: unknown, role: Role) {
+  if (error instanceof ApiError && error.status === 401) return redirectLocalized(loginForRole(role));
 }

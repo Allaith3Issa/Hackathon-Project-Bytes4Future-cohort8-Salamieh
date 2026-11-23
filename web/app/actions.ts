@@ -6,6 +6,7 @@ import { apiRequest, ApiError } from "@/lib/api";
 import type { AuthSession, OfferQrPass } from "@/lib/contract";
 import { publicAccountDestination } from "@/lib/public-account-destination";
 import { authenticatedRequest, clearSession, saveSession, sessionTokens } from "@/lib/session";
+import { requireRole } from "@/lib/staff";
 import { errorMessage, validReferral } from "@/lib/ui";
 
 export interface SignInState {
@@ -82,6 +83,7 @@ export interface PassState {
 }
 
 export async function issueOfferPass(code: string, _state: PassState): Promise<PassState> {
+  await requireRole("customer");
   const { t } = await getI18n();
   if (!validReferral(code)) return { error: t("auth.weCouldnTFindTheReferral") };
   try {

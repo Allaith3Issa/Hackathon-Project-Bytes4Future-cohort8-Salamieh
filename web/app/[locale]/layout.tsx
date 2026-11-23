@@ -48,7 +48,7 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
         </a>
         <header className="border-b border-rule bg-white">
           <div className="page-wrap flex min-h-18 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5 has-[.home-navigation]:max-w-7xl">
-            <Link href={account ? "/" : "/login"} aria-label={account ? t("navigation.home", { value0: t("common.brand") }) : t("common.signIn")} className="inline-flex min-h-11 shrink-0 items-center">
+            <Link href="/" aria-label={t("navigation.home", { value0: t("common.brand") })} className="inline-flex min-h-11 shrink-0 items-center">
               <Image src={mardoodLogo} alt="" sizes="(min-width: 640px) 144px, 112px" className="h-auto w-28 sm:w-36" />
             </Link>
             <HomeNavigation signedIn={Boolean(account)}>
@@ -67,7 +67,7 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
           </div>
         </header>
         <main id="main-content" tabIndex={-1} className="grow">{children}</main>
-        <SiteFooter signedIn={Boolean(account)} />
+        <SiteFooter />
         </I18nProvider>
       </body>
     </html>
