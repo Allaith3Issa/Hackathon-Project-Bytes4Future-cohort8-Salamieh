@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsDefined, IsIn, IsInt, IsNumber, IsObject, Max, Min, ValidateNested } from 'class-validator';
-import { MAX_MONEY_MINOR_UNITS } from '../common/money';
-import { MAX_CAMPAIGN_ITEMS } from './campaign-pricing';
+import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
+import { MAX_CAMPAIGN_ITEMS } from '../campaign-pricing';
 
 const maxMoney = Number(MAX_MONEY_MINOR_UNITS);
 const minorUnits = 'Integer hundredths of one new Syrian Pound (SYP).';

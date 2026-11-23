@@ -6,7 +6,7 @@ const { plainToInstance } = require('class-transformer');
 const { validate } = require('class-validator');
 const { JwtService } = require('@nestjs/jwt');
 const bcrypt = require('bcrypt');
-const { RegisterDto } = require('../dist/auth/register.dto');
+const { RegisterDto } = require('../dist/auth/dto/register.dto');
 
 const databaseUrl = process.env.REGISTRATION_INTEGRATION_DATABASE_URL;
 const registration = (overrides = {}) => ({

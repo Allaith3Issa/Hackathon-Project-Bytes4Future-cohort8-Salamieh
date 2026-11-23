@@ -1,16 +1,11 @@
+import { campaignConversionRate } from '../common/conversion-rate';
 import { toMoneyJsonInteger } from '../common/money';
 import type { Prisma } from '../generated/prisma/client';
-import type { CampaignDto, MerchantCampaignDto } from './campaign.dto';
+import type { CampaignDto, MerchantCampaignDto } from './dto/campaign.dto';
 import { calculateSalePricing, discountedPrice, percentToBasisPoints } from './campaign-pricing';
 
 export const campaignMerchant = { merchant: { select: { shopName: true } } } as const;
 export type CampaignRecord = Prisma.CampaignGetPayload<{ include: typeof campaignMerchant }>;
-
-export function campaignConversionRate(itemsSold: number, clicks: number): number {
-  if (clicks === 0) return 0;
-  const count = BigInt(clicks);
-  return Number((BigInt(itemsSold) * 10000n + count / 2n) / count) / 100;
-}
 
 export function mapCampaign(campaign: CampaignRecord): CampaignDto {
   const discountPercent = campaign.discountPercent.toNumber();

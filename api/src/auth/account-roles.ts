@@ -1,4 +1,4 @@
-import type { Role } from './auth-session.dto';
+import type { Role } from './dto/auth-session.dto';
 
 export function accountRoles(record: {
   isAdmin: boolean;

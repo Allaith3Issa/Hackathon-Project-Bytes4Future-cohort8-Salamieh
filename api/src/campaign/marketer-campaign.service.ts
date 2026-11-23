@@ -1,25 +1,21 @@
+import { pageInfo } from '../common/pagination';
 import { ConflictException, ForbiddenException, HttpException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'node:crypto';
 import { toMoneyJsonInteger } from '../common/money';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { campaignConversionRate, campaignMerchant, mapCampaign } from './campaign-response';
-import type { CampaignPageQueryDto } from './campaign.dto';
+import { campaignConversionRate } from '../common/conversion-rate';
+import { campaignMerchant, mapCampaign } from './campaign-response';
 import type {
   CampaignDiscoveryQueryDto, DiscoverableCampaignPageDto, MarketerMembershipDto, MarketerMembershipLookupDto,
   MarketerMembershipPageDto, MarketerMembershipQueryDto,
-} from './marketer-campaign.dto';
+} from './dto/marketer-campaign.dto';
 
 const membershipCampaign = { campaign: { include: campaignMerchant } } as const;
 type MembershipRecord = Prisma.CampaignMarketerGetPayload<{ include: typeof membershipCampaign }>;
 const demoCampaign = { campaignType: 'product', joinMode: 'open', commissionType: 'fixed' } as const;
 const readSnapshot = { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead };
-
-function pageInfo({ page, pageSize }: CampaignPageQueryDto, total: number) {
-  const lastPage = Math.ceil(total / pageSize);
-  return { page, pageSize, total, previousPage: page > 1 ? page - 1 : null, nextPage: page < lastPage ? page + 1 : null };
-}
 
 function campaignNotFound() {
   return new NotFoundException({ statusCode: 404, code: 'NOT_FOUND', message: 'Campaign not found.' });

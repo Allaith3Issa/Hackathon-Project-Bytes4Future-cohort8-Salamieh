@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const { plainToInstance } = require('class-transformer');
 const { validate } = require('class-validator');
-const { AdminMerchantQueryDto, VerifyMerchantDto } = require('../dist/admin/admin-merchant.dto');
+const { AdminMerchantQueryDto, VerifyMerchantDto } = require('../dist/admin/dto/admin-merchant.dto');
 
 test('admin merchant query validates inherited pagination and verification filters', async () => {
   const options = { whitelist: true, forbidNonWhitelisted: true };

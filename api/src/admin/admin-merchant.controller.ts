@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Patch, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { AuthErrorDto } from '../auth/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
-import { AdminMerchantDto, AdminMerchantPageDto, AdminMerchantQueryDto, VerifyMerchantDto } from './admin-merchant.dto';
+import { AdminMerchantDto, AdminMerchantPageDto, AdminMerchantQueryDto, VerifyMerchantDto } from './dto/admin-merchant.dto';
 import { AdminMerchantService } from './admin-merchant.service';
 
 @ApiTags('Admin merchants')

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { requireRequestAuth, type RequestWithAuth } from './authenticated-actor';
-import type { Role } from './auth-session.dto';
+import type { Role } from './dto/auth-session.dto';
 
 const RequiredRoles = Reflector.createDecorator<readonly Role[]>();
 export const Roles = (...roles: Role[]) => RequiredRoles(roles);

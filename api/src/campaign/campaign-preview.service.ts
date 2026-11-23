@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { toMoneyJsonInteger } from '../common/money';
 import { PrismaService } from '../prisma/prisma.service';
-import { CampaignPreviewDto, CampaignPreviewInputDto } from './campaign-preview.dto';
+import { CampaignPreviewDto, CampaignPreviewInputDto } from './dto/campaign-preview.dto';
 import { calculateProductPricing, CampaignPricingOverflowError, InvalidCampaignPricingError, percentToBasisPoints } from './campaign-pricing';
 
 @Injectable()

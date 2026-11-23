@@ -1,9 +1,9 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import type { RequestWithAuth } from '../auth/authenticated-actor';
+import type { RequestWithAuth } from '../../auth/authenticated-actor';
 
 @Injectable()
-export class ReferralThrottlerGuard extends ThrottlerGuard {
+export class ActorThrottlerGuard extends ThrottlerGuard {
   protected override getTracker(request: RequestWithAuth): Promise<string> {
     const actor = request.auth?.actor;
     return actor ? Promise.resolve(actor.userId) : super.getTracker(request);

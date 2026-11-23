@@ -2,11 +2,11 @@ import { Body, Controller, Header, HttpCode, HttpStatus, Post, UseGuards } from 
 import { ApiBearerAuth, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentActor, type AuthenticatedActor } from '../auth/authenticated-actor';
-import { AuthErrorDto } from '../auth/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { IdempotencyKey } from '../common/idempotency/idempotency-key';
-import { ReferralThrottlerGuard } from '../referral/referral-throttler.guard';
+import { ActorThrottlerGuard } from '../common/http/actor-throttler.guard';
 import { OfferRedeemResultDto, RedeemOfferDto, ScannerCodeDto, ScannerOfferDto } from './scanner.dto';
 import { ScannerService } from './scanner.service';
 
@@ -26,7 +26,7 @@ export class ScannerController {
   @Post('lookup')
   @HttpCode(HttpStatus.OK)
   @Header('Cache-Control', 'no-store')
-  @UseGuards(ReferralThrottlerGuard)
+  @UseGuards(ActorThrottlerGuard)
   @Throttle({ default: { limit: 60, ttl: 60000 } })
   @ApiOperation({ summary: 'Look up an owned product Offer QR before collecting cash' })
   @ApiOkResponse({ type: ScannerOfferDto })

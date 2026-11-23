@@ -1,9 +1,10 @@
 import { MAX_MONEY_MINOR_UNITS } from '../common/money';
+import { MAX_POSTGRES_INT } from '../common/postgres-limits';
 
 const FULL_RATE = 10_000n;
 const PLATFORM_FEE = 500n;
 const CASHBACK = 200n;
-export const MAX_CAMPAIGN_ITEMS = 2_147_483_647;
+export const MAX_CAMPAIGN_ITEMS = MAX_POSTGRES_INT;
 
 type Commission = { type: 'fixed'; amountSyp: bigint } | { type: 'percentage'; basisPoints: bigint };
 

@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Matches, Max, MaxLength, Min } from 'class-validator';
-import { MAX_MONEY_MINOR_UNITS } from '../common/money';
-import { PageDto, PageQueryDto } from '../common/pagination.dto';
-import { TopupPaymentMethod } from '../generated/prisma/client';
+import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
+import { PageDto, PageQueryDto } from '../../common/pagination.dto';
+import { TopupPaymentMethod } from '../../generated/prisma/client';
 
 const money = { type: 'integer', minimum: 0, maximum: Number(MAX_MONEY_MINOR_UNITS),
   description: 'Integer hundredths of one new Syrian Pound (SYP).' } as const;

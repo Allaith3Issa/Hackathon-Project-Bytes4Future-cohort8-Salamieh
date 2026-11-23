@@ -1,11 +1,11 @@
 import { Body, Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentActor, type AuthenticatedActor } from '../auth/authenticated-actor';
-import { AuthErrorDto } from '../auth/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { IdempotencyKey } from '../common/idempotency/idempotency-key';
-import { AdminTopupPageDto, AdminTopupQueryDto, AdminTopupResultDto, CreateAdminTopupDto } from './admin-topup.dto';
+import { AdminTopupPageDto, AdminTopupQueryDto, AdminTopupResultDto, CreateAdminTopupDto } from './dto/admin-topup.dto';
 import { AdminTopupService } from './admin-topup.service';
 
 @ApiTags('Admin top-ups')

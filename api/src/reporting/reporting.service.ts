@@ -1,17 +1,15 @@
 import { ConflictException, Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { campaignConversionRate } from '../campaign/campaign-response';
+import { campaignConversionRate } from '../common/conversion-rate';
 import { toMoneyJsonInteger } from '../common/money';
 import type { PageQueryDto } from '../common/pagination.dto';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { cashbackThresholds } from '../scanner/cashback-milestone';
-import type {
-  CustomerDashboardDto, CustomerPurchasePageDto, MarketerMerchantEarningsPageDto, MarketerStatsDto,
-  MarketerWalletDto, MarketerWalletTransactionPageDto, MerchantDashboardDto, MerchantWalletDto,
-  MerchantWalletTransactionDto, MerchantWalletTransactionPageDto,
-} from './reporting.dto';
-import { reportingPage } from './reporting-page';
+import { cashbackThresholds } from '../config/cashback-thresholds';
+import type { CustomerDashboardDto, CustomerPurchasePageDto } from './dto/customer-reporting.dto';
+import type { MarketerMerchantEarningsPageDto, MarketerStatsDto, MarketerWalletDto, MarketerWalletTransactionPageDto } from './dto/marketer-reporting.dto';
+import type { MerchantDashboardDto, MerchantWalletDto, MerchantWalletTransactionDto, MerchantWalletTransactionPageDto } from './dto/merchant-reporting.dto';
+import { readPage } from '../common/pagination';
 
 const newestMovement = [{ createdAt: 'desc' }, { id: 'desc' }] satisfies Prisma.MoneyMovementOrderByWithRelationInput[];
 const saleTotals = Prisma.sql`COUNT(*) AS sales, COALESCE(SUM(quantity), 0) AS items,
@@ -76,7 +74,7 @@ export class ReportingService {
         { walletId: wallet.id, kind: { in: ['merchant_topup', 'campaign_reserve_lock', 'campaign_reserve_unlock'] } },
         { kind: 'sale_reserve_debit', campaign: { merchantId: userId } },
       ] };
-      return reportingPage(page, await tx.moneyMovement.count({ where }), async (skip, take) => {
+      return readPage(page, await tx.moneyMovement.count({ where }), async (skip, take) => {
         const rows = await tx.moneyMovement.findMany({ where, skip, take, orderBy: newestMovement, include: {
           campaign: { select: { productName: true } }, topup: { select: { referenceNote: true } },
         } });
@@ -137,7 +135,7 @@ export class ReportingService {
         JOIN merchant_profiles m ON m.user_id = s.merchant_id
         WHERE cm.marketer_id = ${userId}::uuid`;
       const [count] = await tx.$queryRaw<{ total: bigint }[]>`SELECT COUNT(DISTINCT s.merchant_id) AS total ${sales}`;
-      return reportingPage(page, Number(count.total), async (skip, take) => {
+      return readPage(page, Number(count.total), async (skip, take) => {
         const rows = await tx.$queryRaw<MerchantEarningsRow[]>`
           SELECT s.merchant_id AS "merchantId", COUNT(*) AS sales, SUM(s.quantity) AS items,
             SUM(s.marketer_commission_syp)::text AS earned, m.shop_name AS "shopName"
@@ -155,7 +153,7 @@ export class ReportingService {
     return this.read(async (tx) => {
       const wallet = await this.wallet(tx, userId, 'marketer');
       const where = { walletId: wallet.id, kind: 'marketer_commission_credit' } satisfies Prisma.MoneyMovementWhereInput;
-      return reportingPage(page, await tx.moneyMovement.count({ where }), async (skip, take) => {
+      return readPage(page, await tx.moneyMovement.count({ where }), async (skip, take) => {
         const rows = await tx.moneyMovement.findMany({ where, skip, take, orderBy: newestMovement, include: {
           campaign: { select: { productName: true, merchant: { select: { shopName: true } } } },
         } });
@@ -195,7 +193,7 @@ export class ReportingService {
   customerPurchases(userId: string, page: PageQueryDto): Promise<CustomerPurchasePageDto> {
     return this.read(async (tx) => {
       const where = { customerId: userId };
-      return reportingPage(page, await tx.sale.count({ where }), async (skip, take) => {
+      return readPage(page, await tx.sale.count({ where }), async (skip, take) => {
         const rows = await tx.sale.findMany({ where, skip, take, orderBy: [{ scannedAt: 'desc' }, { id: 'desc' }],
           select: { id: true, quantity: true, customerPaidCashSyp: true, customerCashbackSyp: true, scannedAt: true,
             merchant: { select: { shopName: true } }, campaign: { select: { productName: true } } },

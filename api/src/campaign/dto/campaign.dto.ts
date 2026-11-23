@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
 import { IsIn, IsISO8601, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
-import { MAX_MONEY_MINOR_UNITS } from '../common/money';
-import { PageDto, PageQueryDto } from '../common/pagination.dto';
+import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
+import { PageDto, PageQueryDto } from '../../common/pagination.dto';
 import { CampaignPreviewInputDto } from './campaign-preview.dto';
 
 export { PageDto as CampaignPageDto, PageQueryDto as CampaignPageQueryDto };

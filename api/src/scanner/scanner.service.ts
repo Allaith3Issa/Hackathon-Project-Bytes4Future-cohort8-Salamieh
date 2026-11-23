@@ -6,7 +6,8 @@ import { IdempotencyService } from '../common/idempotency/idempotency.service';
 import { MAX_MONEY_MINOR_UNITS, toMoneyJsonInteger } from '../common/money';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { accrueCashback, cashbackThresholds } from './cashback-milestone';
+import { cashbackThresholds } from '../config/cashback-thresholds';
+import { accrueCashback } from './cashback-milestone';
 import type { OfferRedeemResultDto, ScannerOfferDto } from './scanner.dto';
 
 const settlementRelations = {
