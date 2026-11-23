@@ -6,6 +6,7 @@ import { HealthModule } from './health/health.module';
 import { validateDatabaseConfig } from './prisma/database-config';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferralModule } from './referral/referral.module';
+import { ScannerModule } from './scanner/scanner.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ReferralModule } from './referral/referral.module';
     AuthModule,
     CampaignModule,
     ReferralModule,
+    ScannerModule,
   ],
 })
 export class AppModule {}
