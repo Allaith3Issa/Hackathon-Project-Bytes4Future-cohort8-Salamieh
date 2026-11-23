@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { CustomerReportingController, MarketerReportingController, MerchantReportingController } from './reporting.controller';
+import { CustomerReportingController } from './customer-reporting.controller';
+import { MarketerReportingController } from './marketer-reporting.controller';
+import { MerchantReportingController } from './merchant-reporting.controller';
 import { ReportingService } from './reporting.service';
 
 @Module({

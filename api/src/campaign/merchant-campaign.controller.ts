@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiExtraModels, ApiHeader, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentActor, type AuthenticatedActor } from '../auth/authenticated-actor';
-import { AuthErrorDto } from '../auth/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { IdempotencyKey } from '../common/idempotency/idempotency-key';
-import { CampaignFixedCommissionDto, CampaignPercentageCommissionDto, LaunchCampaignDto, MerchantCampaignDto, MerchantCampaignPageDto, MerchantCampaignQueryDto } from './campaign.dto';
-import { CampaignPreviewDto, CampaignPreviewInputDto } from './campaign-preview.dto';
+import { CampaignFixedCommissionDto, CampaignPercentageCommissionDto, LaunchCampaignDto, MerchantCampaignDto, MerchantCampaignPageDto, MerchantCampaignQueryDto } from './dto/campaign.dto';
+import { CampaignPreviewDto, CampaignPreviewInputDto } from './dto/campaign-preview.dto';
 import { CampaignPreviewService } from './campaign-preview.service';
 import { CampaignService } from './campaign.service';
 

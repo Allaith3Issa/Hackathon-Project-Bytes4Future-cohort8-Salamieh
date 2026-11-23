@@ -1,9 +1,9 @@
 import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger';
 import { IsEnum, IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { AccountDto, MerchantAccountDto } from '../auth/auth-session.dto';
-import { MAX_MONEY_MINOR_UNITS } from '../common/money';
-import { PageDto, PageQueryDto } from '../common/pagination.dto';
-import { MerchantVerificationStatus } from '../generated/prisma/client';
+import { AccountDto, MerchantAccountDto } from '../../auth/dto/auth-session.dto';
+import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
+import { PageDto, PageQueryDto } from '../../common/pagination.dto';
+import { MerchantVerificationStatus } from '../../generated/prisma/client';
 
 const decisions = ['verified', 'rejected'] as const;
 const money = { type: 'integer', minimum: 0, maximum: Number(MAX_MONEY_MINOR_UNITS),

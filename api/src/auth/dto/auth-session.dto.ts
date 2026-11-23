@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { MAX_MONEY_MINOR_UNITS } from '../common/money';
+import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
 
 export const ACCESS_TOKEN_SECONDS = 900;
 const roles = ['admin', 'customer', 'marketer', 'merchant'] as const;
@@ -68,15 +68,4 @@ export class AuthSessionDto {
 
   @ApiProperty({ type: AccountDto })
   user!: AccountDto;
-}
-
-export class AuthErrorDto {
-  @ApiProperty({ type: 'integer' })
-  statusCode!: number;
-
-  @ApiProperty()
-  code!: string;
-
-  @ApiProperty()
-  message!: string;
 }

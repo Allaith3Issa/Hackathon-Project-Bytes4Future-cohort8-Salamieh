@@ -1,16 +1,16 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { reportingPage } = require('../dist/reporting/reporting-page');
+const { readPage } = require('../dist/common/pagination');
 const { ReportingService } = require('../dist/reporting/reporting.service');
 
 test('reporting pagination calculates slice and navigation and avoids out-of-range offsets', async () => {
   const read = async (skip, take) => [skip, take];
-  assert.deepEqual(await reportingPage({ page: 2, pageSize: 2 }, 5, read),
+  assert.deepEqual(await readPage({ page: 2, pageSize: 2 }, 5, read),
     { items: [2, 2], page: 2, pageSize: 2, total: 5, previousPage: 1, nextPage: 3 });
   const neverRead = async () => assert.fail('No rows should be fetched for this page');
-  assert.deepEqual(await reportingPage({ page: 1, pageSize: 20 }, 0, neverRead),
+  assert.deepEqual(await readPage({ page: 1, pageSize: 20 }, 0, neverRead),
     { items: [], page: 1, pageSize: 20, total: 0, previousPage: null, nextPage: null });
-  assert.deepEqual(await reportingPage({ page: Number.MAX_SAFE_INTEGER, pageSize: 100 }, 3, neverRead),
+  assert.deepEqual(await readPage({ page: Number.MAX_SAFE_INTEGER, pageSize: 100 }, 3, neverRead),
     { items: [], page: Number.MAX_SAFE_INTEGER, pageSize: 100, total: 3,
       previousPage: Number.MAX_SAFE_INTEGER - 1, nextPage: null });
 });

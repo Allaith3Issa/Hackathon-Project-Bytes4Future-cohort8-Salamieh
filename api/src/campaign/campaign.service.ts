@@ -1,3 +1,4 @@
+import { pageInfo } from '../common/pagination';
 import {
   BadRequestException, ConflictException, ForbiddenException, HttpException, Injectable,
   InternalServerErrorException, Logger, NotFoundException, OnModuleDestroy, OnModuleInit,
@@ -8,7 +9,7 @@ import { Prisma, type MerchantVerificationStatus } from '../generated/prisma/cli
 import { PrismaService } from '../prisma/prisma.service';
 import { calculateProductPricing, InvalidCampaignPricingError, percentToBasisPoints } from './campaign-pricing';
 import { campaignMerchant, mapMerchantCampaigns } from './campaign-response';
-import type { LaunchCampaignDto, MerchantCampaignDto, MerchantCampaignPageDto, MerchantCampaignQueryDto } from './campaign.dto';
+import type { LaunchCampaignDto, MerchantCampaignDto, MerchantCampaignPageDto, MerchantCampaignQueryDto } from './dto/campaign.dto';
 
 function campaignNotFound() {
   return new NotFoundException({ statusCode: 404, code: 'NOT_FOUND', message: 'Campaign not found.' });
@@ -109,8 +110,7 @@ export class CampaignService implements OnModuleInit, OnModuleDestroy {
           where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize,
           take: pageSize, include: campaignMerchant,
         });
-        return { items: await mapMerchantCampaigns(tx, campaigns), page, pageSize, total,
-          previousPage: page > 1 ? page - 1 : null, nextPage: page < lastPage ? page + 1 : null };
+        return { items: await mapMerchantCampaigns(tx, campaigns), ...pageInfo({ page, pageSize }, total) };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
     } catch (error) {
       return campaignFailure(error);
