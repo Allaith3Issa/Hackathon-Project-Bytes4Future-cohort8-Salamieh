@@ -15,16 +15,18 @@ const homeLinks = [
   { href: "/about", label: "navigation.aboutUs" },
 ] as const;
 
-export function HomeNavigation({ children }: { children: ReactNode }) {
+export function HomeNavigation({ children, signedIn }: { children: ReactNode; signedIn: boolean }) {
   const { t } = useI18n();
   const pathname = splitLocale(usePathname() ?? "/").pathname;
   const language = <Suspense><LanguageSwitcher /></Suspense>;
   if (pathname === "/login" || pathname === "/register") {
     return (
       <div className="flex items-center gap-2">
-        <nav aria-label={t("navigation.mainNavigation")}>
-          <Link href="/" className="button-secondary px-3 sm:px-4">{t("navigation.home2")}</Link>
-        </nav>
+        {signedIn && (
+          <nav aria-label={t("navigation.mainNavigation")}>
+            <Link href="/" className="button-secondary px-3 sm:px-4">{t("navigation.home2")}</Link>
+          </nav>
+        )}
         {language}
       </div>
     );

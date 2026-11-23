@@ -4,9 +4,10 @@ import type { Metadata } from "next";
 import Link from "@/components/localized-link";
 import { notFound } from "next/navigation";
 import { CloseCampaign } from "@/components/close-campaign";
+import { RecoveringSession } from "@/components/recovering-session";
 import { ApiError } from "@/lib/api";
 import { authenticatedRequest } from "@/lib/session";
-import { expiredRedirect, requireRole } from "@/lib/staff";
+import { expiredRedirect, requirePageRole } from "@/lib/staff";
 import type { MerchantCampaign } from "@/lib/staff-contract";
 import { staffError, statusLabels } from "@/lib/staff-ui";
 
@@ -16,14 +17,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const { t, locale, formatNumber, formatSyp: formatMoney, formatDate } = await getI18n();
-  await requireRole("merchant");
+  if (!(await requirePageRole("merchant"))) return <RecoveringSession />;
   const { id } = await params;
   if (!/^[0-9a-f-]{8,64}$/i.test(id)) notFound();
   let c: MerchantCampaign;
   try {
     c = await authenticatedRequest<MerchantCampaign>(`/merchant/campaigns/${encodeURIComponent(id)}`);
   } catch (error) {
-    await expiredRedirect(error, "merchant");
+    await expiredRedirect(error);
     if (error instanceof ApiError && error.status === 404) notFound();
     return (
       <div className="page-wrap space-y-4 py-7 sm:py-12">

@@ -28,7 +28,11 @@ function makeI18n(locale: Locale) {
     formatNumber: (value: number) => number.format(value),
     formatDate: (value: string) => date.format(new Date(value)),
     formatPercent: (value: number) => percent.format(value / 100),
-    formatSyp: (minor: number) => `${syp.format(minor / 100)} ${locale === "ar" ? "ل.س." : "SYP"}`,
+    formatSyp: (minor: number) => {
+      const digits = String(Math.abs(minor)).padStart(3, "0");
+      const amount = `${minor < 0 ? "-" : ""}${digits.slice(0, -2)}.${digits.slice(-2)}` as `${number}`;
+      return `${syp.format(amount)} ${locale === "ar" ? "ل.س." : "SYP"}`;
+    },
   };
 }
 

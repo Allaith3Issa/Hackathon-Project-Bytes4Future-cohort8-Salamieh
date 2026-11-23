@@ -5,10 +5,11 @@ import { apiRequest, ApiError } from "@/lib/api";
 import type { AuthSession } from "@/lib/contract";
 import { publicAccountDestination } from "@/lib/public-account-destination";
 import { validateRegistration, type RegistrationErrors } from "@/lib/registration";
-import { saveSession } from "@/lib/session";
+import { requireAccount, saveSession } from "@/lib/session";
 import { errorMessage } from "@/lib/ui";
 
 export async function signUp(offer: string | undefined, _state: RegistrationErrors, data: FormData): Promise<RegistrationErrors> {
+  await requireAccount();
   const { t } = await getI18n();
   const { body, errors } = validateRegistration(data, t);
   if (Object.keys(errors).length) return errors;

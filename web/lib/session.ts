@@ -4,9 +4,9 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { apiRequest, ApiError } from "./api";
 import type { Account, AuthSession } from "./contract";
+import { redirectLocalized } from "./i18n-server";
+import { accessCookie, refreshCookie } from "./session-cookies";
 
-const accessCookie = "affiliate_access";
-const refreshCookie = "affiliate_refresh";
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -44,6 +44,16 @@ export const getAccount = cache(async () => {
     throw error;
   }
 });
+
+export async function requireAccount() {
+  return (await getAccount()) ?? redirectLocalized("/login");
+}
+
+export async function requirePageAccount() {
+  const account = await getAccount();
+  if (account || (await sessionTokens()).refreshToken) return account;
+  return redirectLocalized("/login");
+}
 
 export async function authenticatedRequest<T>(
   path: `/${string}`,

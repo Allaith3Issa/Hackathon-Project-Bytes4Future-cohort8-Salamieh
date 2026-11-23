@@ -1,6 +1,7 @@
 import { getI18n } from "@/lib/i18n-server";
 import Link from "@/components/localized-link";
-import { getAccount } from "@/lib/session";
+import { RecoveringSession } from "@/components/recovering-session";
+import { requirePageAccount } from "@/lib/session";
 
 const steps = [
   { number: "home.stepOne", title: "home.openTheOfferLink", detail: "home.checkTheOfferDetailsAndPrice" },
@@ -88,14 +89,15 @@ async function OfferPreview() {
 }
 
 export default async function Home() {
+  const account = await requirePageAccount();
+  if (!account) return <RecoveringSession />;
   const { t } = await getI18n();
   const [beforeCity, punctuation, afterCity] = t("home.title").split(/\{city\}(،?)/);
-  const account = await getAccount().catch(() => null);
-  const roles = account?.roles ?? [];
+  const { roles } = account;
   const primaryAction = roles.includes("customer") ? { href: "/customer", label: t("home.viewCashback") }
     : roles.includes("merchant") ? { href: "/merchant/campaigns", label: t("navigation.merchantDashboard") }
-    : roles.includes("admin") ? { href: "/admin/topups", label: t("navigation.admin") }
-    : roles.includes("marketer") ? null
+    : roles.includes("admin") ? { href: "/admin/revenue", label: t("navigation.admin") }
+    : roles.includes("marketer") ? { href: "/marketer/earnings", label: t("earnings.marketerTitle") }
     : { href: "/login", label: t("common.signIn") };
   return (
     <>
@@ -110,11 +112,7 @@ export default async function Home() {
               {t("home.openTheOfferLinkAndShow")}
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-x-5">
-                {primaryAction ? (
-                  <Link href={primaryAction.href} className="button-primary">{primaryAction.label}</Link>
-                ) : (
-                  <p className="text-sm font-semibold text-muted">{t("home.youReSignedInAsA")}</p>
-                )}
+              <Link href={primaryAction.href} className="button-primary">{primaryAction.label}</Link>
               <button
                 type="button"
                 {...{ command: "show-modal", commandfor: "how-it-works-dialog" }}

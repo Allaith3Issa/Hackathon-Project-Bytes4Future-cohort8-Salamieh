@@ -2,10 +2,27 @@ import type { Account } from "./contract";
 export type { Page } from "./contract";
 
 export interface MerchantWallet { availableBalanceSyp: number; totalLockedReservesSyp: number; creditLimitSyp: number }
+export interface MarketerWallet {
+  availableBalanceSyp: number;
+  pendingPayoutSyp: number;
+  totalEarnedSyp: number;
+  totalConfirmedPaidOutSyp: number;
+}
+export interface AdminRevenueSummary { netPlatformFeesSyp: number; totalMarketerCommissionSyp: number }
+export interface AdminMarketerEarnings {
+  id: string;
+  name: string;
+  phone: string;
+  salesCount: number;
+  totalEarnedSyp: number;
+}
 export interface AdminMerchant {
   id: string; name: string; phone: string; roles: Account["roles"]; createdAt: string;
   merchant: NonNullable<Account["merchant"]>; wallet: MerchantWallet;
 }
+export const merchantVerificationStatuses = ["pending", "verified", "rejected"] as const;
+export type MerchantVerificationStatus = (typeof merchantVerificationStatuses)[number];
+export type MerchantVerificationDecision = Exclude<MerchantVerificationStatus, "pending">;
 export type PaymentMethod = "cash" | "sham_cash" | "syriatel_cash" | "bank_transfer";
 export interface AdminTopupResult {
   topupId: string; merchantId: string; shopName: string; amountSyp: number; paymentMethod: PaymentMethod;

@@ -6,6 +6,6 @@ export function publicAccountDestination(roles: readonly Role[], offer?: string)
     return typeof offer === "string" && validReferral(offer) ? `/r/${offer}` : "/customer";
   }
   if (roles.includes("merchant")) return "/merchant/campaigns";
-  if (roles.includes("marketer")) return "/";
+  if (roles.includes("marketer")) return "/marketer/earnings";
   return null;
 }

@@ -6,8 +6,10 @@ import { revalidatePath } from "next/cache";
 import { ApiError, apiRequest } from "@/lib/api";
 import type { AuthSession } from "@/lib/contract";
 import { authenticatedRequest, saveSession } from "@/lib/session";
+import { expiredRedirect, requireRole } from "@/lib/staff";
 import type {
-  VoucherRedeemResult, AdminTopupResult, CampaignPreview, MerchantCampaign, OfferRedeemResult, ScannerLookup,
+  VoucherRedeemResult, AdminMerchant, AdminTopupResult, CampaignPreview, MerchantCampaign, MerchantVerificationDecision,
+  OfferRedeemResult, ScannerLookup,
 } from "@/lib/staff-contract";
 import { parseMoney, parsePercent, parsePositiveMoney, staffError } from "@/lib/staff-ui";
 
@@ -40,13 +42,45 @@ export async function staffSignIn(
   } catch (error) {
     return { error: staffError(error, t) };
   }
-  return redirectLocalized(kind === "admin" ? "/admin/topups" : "/merchant/campaigns/new");
+  return redirectLocalized(kind === "admin" ? "/admin/revenue" : "/merchant/campaigns/new");
 }
 
 
 export interface TopupState {
   result?: AdminTopupResult; error?: string;
   errors?: Partial<Record<"merchantId" | "amount" | "note", string>>;
+}
+
+export interface MerchantVerificationState {
+  result?: { name: string; status: MerchantVerificationDecision };
+  error?: string;
+}
+
+export async function verifyMerchant(data: FormData): Promise<MerchantVerificationState> {
+  await requireRole("admin");
+  const { t, locale } = await getI18n();
+  const merchantId = text(data, "merchantId");
+  const status = text(data, "status");
+  if (!uuid.test(merchantId) || (status !== "verified" && status !== "rejected")) {
+    return { error: t("errors.checkTheInformationYouEnteredThen") };
+  }
+  const queuePath = localizedPath("/admin/merchants", locale, true);
+  try {
+    const account = await authenticatedRequest<AdminMerchant>(`/admin/merchants/${merchantId}/verification`, {
+      method: "PATCH",
+      body: { status },
+    });
+    revalidatePath(queuePath);
+    if (status === "verified") revalidatePath(localizedPath("/admin/topups", locale, true));
+    return { result: { name: account.merchant.name, status } };
+  } catch (error) {
+    await expiredRedirect(error);
+    if (error instanceof ApiError && error.code === "INVALID_STATUS_TRANSITION") {
+      revalidatePath(queuePath);
+      return { error: t("verification.alreadyDecided") };
+    }
+    return { error: staffError(error, t) };
+  }
 }
 
 export async function topUp(_state: TopupState, data: FormData): Promise<TopupState> {

@@ -39,7 +39,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
           <p className="mt-2 leading-7 text-muted">{missing ? t("offers.checkTheLinkYouReceivedThen") : errorMessage(error, t)}</p>
           <div className="mt-5 flex flex-wrap items-center gap-4">
             {!missing && <a className="button-primary" href={localizedPath(`/r/${code}`, locale)}>{t("common.tryAgain")}</a>}
-            <Link href="/" className={missing ? "button-secondary" : "text-link"}>{t("common.home")}</Link>
+            <Link href="/login" className={missing ? "button-secondary" : "text-link"}>{t("common.signIn")}</Link>
           </div>
         </div>
       </section>
@@ -99,9 +99,9 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
             <section className="surface p-5 sm:p-6">
               <h2 className="text-lg font-bold sm:text-xl">{t("offers.signInToGetADiscount")}</h2>
               <div className="mt-4"><SignInForm offer={code} customerOnly /></div>
-              <p className="mt-4 text-center text-sm leading-6 text-muted">
+              {account && <p className="mt-4 text-center text-sm leading-6 text-muted">
                 {t("auth.needAnAccount")}{" "}<Link className="text-link" href={`/register?offer=${code}`}>{t("auth.createAccount")}</Link>
-              </p>
+              </p>}
             </section>
           )}
         </div>

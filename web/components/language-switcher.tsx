@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { localizedPath, splitLocale } from "@/lib/locale";
+import { merchantVerificationStatuses } from "@/lib/staff-contract";
 import { validReferral } from "@/lib/ui";
 import { useI18n } from "./i18n-provider";
 
@@ -17,6 +18,10 @@ export function LanguageSwitcher() {
   if (offer && extraOffer === undefined && validReferral(offer)) parameters.set("offer", offer);
   if (page && extraPage === undefined && /^[1-9][0-9]{0,7}$/.test(page)) parameters.set("page", page);
   if (query.get("expired") === "1") parameters.set("expired", "1");
+  const [status, extraStatus] = query.getAll("status");
+  if (pathname === "/admin/merchants" && extraStatus === undefined && merchantVerificationStatuses.some((value) => value === status)) {
+    parameters.set("status", status);
+  }
   const search = parameters.size ? `?${parameters}` : "";
   return (
     <nav aria-label={t("navigation.language")} className="inline-flex shrink-0 items-center rounded-lg border border-rule bg-white p-0.5 text-xs">
