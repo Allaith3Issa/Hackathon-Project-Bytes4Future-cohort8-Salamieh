@@ -19,7 +19,7 @@ export default async function MarketerEarningsPage() {
   try {
     wallet = await authenticatedRequest<MarketerWallet>("/marketer/wallet");
   } catch (error) {
-    await expiredRedirect(error);
+    await expiredRedirect(error, "marketer");
     failure = staffError(error, t);
   }
 

@@ -1,10 +1,12 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { apiRequest, ApiError } from "./api";
 import type { Account, AuthSession } from "./contract";
-import { redirectLocalized } from "./i18n-server";
+import { getI18n } from "./i18n-server";
+import { localizedPath } from "./locale";
 import { accessCookie, refreshCookie } from "./session-cookies";
 
 const cookieOptions = {
@@ -45,14 +47,14 @@ export const getAccount = cache(async () => {
   }
 });
 
-export async function requireAccount() {
-  return (await getAccount()) ?? redirectLocalized("/login");
-}
+export async function canShowGuestAuthForm() {
+  if (await getAccount()) {
+    const { locale } = await getI18n();
+    redirect(localizedPath("/", locale, true));
+  }
 
-export async function requirePageAccount() {
-  const account = await getAccount();
-  if (account || (await sessionTokens()).refreshToken) return account;
-  return redirectLocalized("/login");
+  // A refresh cookie only permits recovery. The account must still be verified.
+  return !(await sessionTokens()).refreshToken;
 }
 
 export async function authenticatedRequest<T>(

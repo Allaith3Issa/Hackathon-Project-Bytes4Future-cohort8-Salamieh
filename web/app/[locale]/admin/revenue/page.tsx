@@ -22,7 +22,7 @@ async function readReport<T>(endpoint: `/${string}`) {
     return { data: await authenticatedRequest<T>(endpoint) };
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
-    await expiredRedirect(error);
+    await expiredRedirect(error, "admin");
     return { error };
   }
 }

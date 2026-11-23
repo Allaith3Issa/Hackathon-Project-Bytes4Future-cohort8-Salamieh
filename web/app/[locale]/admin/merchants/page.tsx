@@ -39,7 +39,7 @@ export default async function MerchantsPage({
     queue = await authenticatedRequest<Page<AdminMerchant>>(`${path}?verificationStatus=${status}&page=${page}`);
   } catch (error) {
     if (!(error instanceof ApiError)) throw error;
-    await expiredRedirect(error);
+    await expiredRedirect(error, "admin");
     failure = staffError(error, t);
   }
 

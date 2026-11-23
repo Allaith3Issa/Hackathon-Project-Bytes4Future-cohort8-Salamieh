@@ -21,7 +21,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   try {
     data = await authenticatedRequest<Page<MerchantCampaign>>(`/merchant/campaigns?page=${n}`);
   } catch (error) {
-    await expiredRedirect(error);
+    await expiredRedirect(error, "merchant");
     return (
       <div className="page-wrap space-y-4 py-7 sm:py-12">
         <h1 className="page-title">{t("campaigns.myCampaigns")}</h1>

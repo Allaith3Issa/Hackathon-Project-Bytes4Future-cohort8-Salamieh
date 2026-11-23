@@ -21,7 +21,7 @@ export default async function TopupsPage() {
   try {
     merchants = (await authenticatedRequest<Page<AdminMerchant>>("/admin/merchants?verificationStatus=verified&pageSize=100")).items;
   } catch (error) {
-    await expiredRedirect(error);
+    await expiredRedirect(error, "admin");
     failure = staffError(error, t);
     if (!(error instanceof ApiError)) throw error;
   }

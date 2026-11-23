@@ -1,7 +1,6 @@
 import { getI18n } from "@/lib/i18n-server";
 import Link from "@/components/localized-link";
-import { RecoveringSession } from "@/components/recovering-session";
-import { requirePageAccount } from "@/lib/session";
+import { getAccount } from "@/lib/session";
 
 const steps = [
   { number: "home.stepOne", title: "home.openTheOfferLink", detail: "home.checkTheOfferDetailsAndPrice" },
@@ -89,11 +88,10 @@ async function OfferPreview() {
 }
 
 export default async function Home() {
-  const account = await requirePageAccount();
-  if (!account) return <RecoveringSession />;
+  const account = await getAccount().catch(() => null);
   const { t } = await getI18n();
   const [beforeCity, punctuation, afterCity] = t("home.title").split(/\{city\}(،?)/);
-  const { roles } = account;
+  const roles = account?.roles ?? [];
   const primaryAction = roles.includes("customer") ? { href: "/customer", label: t("home.viewCashback") }
     : roles.includes("merchant") ? { href: "/merchant/campaigns", label: t("navigation.merchantDashboard") }
     : roles.includes("admin") ? { href: "/admin/revenue", label: t("navigation.admin") }

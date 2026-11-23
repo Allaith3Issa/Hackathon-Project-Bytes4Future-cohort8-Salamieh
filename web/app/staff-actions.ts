@@ -74,7 +74,7 @@ export async function verifyMerchant(data: FormData): Promise<MerchantVerificati
     if (status === "verified") revalidatePath(localizedPath("/admin/topups", locale, true));
     return { result: { name: account.merchant.name, status } };
   } catch (error) {
-    await expiredRedirect(error);
+    await expiredRedirect(error, "admin");
     if (error instanceof ApiError && error.code === "INVALID_STATUS_TRANSITION") {
       revalidatePath(queuePath);
       return { error: t("verification.alreadyDecided") };
@@ -84,6 +84,7 @@ export async function verifyMerchant(data: FormData): Promise<MerchantVerificati
 }
 
 export async function topUp(_state: TopupState, data: FormData): Promise<TopupState> {
+  await requireRole("admin");
   const { t, locale } = await getI18n();
   const key = text(data, "key");
   const merchantId = text(data, "merchantId");
@@ -117,6 +118,7 @@ export interface CampaignState {
 }
 
 export async function campaignAction(state: CampaignState, data: FormData): Promise<CampaignState> {
+  await requireRole("merchant");
   const { t } = await getI18n();
   const launch = text(data, "intent") === "launch";
   const key = text(data, "key");
@@ -166,6 +168,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
 export interface CloseState { campaign?: MerchantCampaign; error?: string }
 
 export async function closeCampaign(id: string, _state: CloseState): Promise<CloseState> {
+  await requireRole("merchant");
   const { t, locale } = await getI18n();
   const path = `/merchant/campaigns/${encodeURIComponent(id)}` as const;
   try {
@@ -179,6 +182,7 @@ export async function closeCampaign(id: string, _state: CloseState): Promise<Clo
 
 
 export async function lookupOffer(code: string): Promise<{ lookup?: ScannerLookup; error?: string }> {
+  await requireRole("merchant");
   const { t } = await getI18n();
   const value = code.trim();
   if (!value || value.length > 200) return { error: t("validation.enterTheCodeShownOnThe") };
@@ -190,6 +194,7 @@ export async function lookupOffer(code: string): Promise<{ lookup?: ScannerLooku
 }
 
 export async function redeemOffer(code: string, key: string): Promise<{ result?: OfferRedeemResult; error?: string; terminal?: boolean }> {
+  await requireRole("merchant");
   const { t } = await getI18n();
   if (!uuid.test(key)) return { error: t(KEY_ERROR), terminal: true };
   try {
@@ -205,6 +210,7 @@ export type VoucherOutcome = "uncertain" | "exceeds" | "rejected";
 export async function redeemVoucher(
   code: string, billTotal: string, key: string,
 ): Promise<{ result?: VoucherRedeemResult; error?: string; outcome?: VoucherOutcome }> {
+  await requireRole("merchant");
   const { t } = await getI18n();
   const bill = parsePositiveMoney(billTotal);
   if (!bill) return { error: t("validation.enterABillTotalGreaterThan") };

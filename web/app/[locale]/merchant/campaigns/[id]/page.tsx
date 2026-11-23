@@ -24,7 +24,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   try {
     c = await authenticatedRequest<MerchantCampaign>(`/merchant/campaigns/${encodeURIComponent(id)}`);
   } catch (error) {
-    await expiredRedirect(error);
+    await expiredRedirect(error, "merchant");
     if (error instanceof ApiError && error.status === 404) notFound();
     return (
       <div className="page-wrap space-y-4 py-7 sm:py-12">
