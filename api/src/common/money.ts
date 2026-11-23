@@ -1,7 +1,8 @@
 import { HttpStatus } from '@nestjs/common';
 import { apiError } from './api-error';
 
-export const MAX_SYP = 9_007_199_254_740_991n;
+/** Maximum safe JSON integer in minor units (hundredths of one new SYP). */
+export const MAX_MONEY_MINOR_UNITS = 9_007_199_254_740_991n;
 
 export function parseSyp(value: string | number | bigint): bigint {
   let amount: bigint;
@@ -14,7 +15,7 @@ export function parseSyp(value: string | number | bigint): bigint {
       'A calculated amount is outside the supported SYP range.',
     );
   }
-  if (amount < 0n || amount > MAX_SYP) {
+  if (amount < 0n || amount > MAX_MONEY_MINOR_UNITS) {
     throw apiError(
       HttpStatus.CONFLICT,
       'AMOUNT_OUT_OF_RANGE',
