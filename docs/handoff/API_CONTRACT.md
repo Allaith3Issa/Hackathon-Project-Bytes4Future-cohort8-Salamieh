@@ -460,10 +460,13 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/users` | Admin | Pagination, optional `role` | `200 Page<AdminUser>` |
 | `GET /admin/campaigns` | Admin | Pagination, optional `status` | `200 Page<AdminCampaign>` |
 | `GET /admin/overview` | Admin | None | `200 AdminOverview` |
+| `GET /admin/revenue` | Admin | None | `200 AdminRevenue` |
 
 For the MVP, merchant verification changes `pending` to `verified` or `rejected`. Repeating the same decision returns `200`. Supplying `contractReference` sets it, and omitting it preserves the current value. Reversing a decided status returns `409 INVALID_STATUS_TRANSITION`. When conflicting decisions arrive concurrently, the first committed decision wins.
 
 Top-ups record confirmed offline payments to verified merchants. The amount must be a positive safe integer in new SYP minor units, and `referenceNote` must be nonblank and at most 256 characters. The post-credit balance is captured when the wallet is credited. POST always returns a number. History returns that stored balance and uses `null` only for legacy records whose post-credit balance cannot be verified. History is ordered by creation time descending, then top-up ID descending.
+
+Revenue is the all-time sum of the persisted net platform fees on committed sales, in new SYP minor units. Unredeemed or expired offers, failed or rolled-back settlements, top-ups, and reserve movements contribute nothing. Replaying a settlement does not add revenue. The endpoint returns `Cache-Control: no-store`, returns `0` when no sales exist, and returns `409 AMOUNT_OUT_OF_RANGE` if the total exceeds the monetary limit.
 
 ### Payout accounting (future)
 
@@ -497,6 +500,10 @@ type AdminMerchant = AdminUser & {
   wallet: MerchantWallet;
 };
 type AdminCampaign = MerchantCampaign & { merchantId: string; shopName: string };
+
+type AdminRevenue = {
+  netPlatformFeesSyp: number;
+};
 
 type AdminOverview = {
   merchantCount: number;
