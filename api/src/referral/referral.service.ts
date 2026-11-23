@@ -87,7 +87,10 @@ export class ReferralService {
   async issue(code: string, customerId: string): Promise<{ statusCode: 200 | 201; body: OfferQrPassDto }> {
     try {
       return await this.prisma.getClient().$transaction(async (tx) => {
-        const { attribution, campaign } = await this.lockActiveReferral(tx, code);
+        const { attribution, campaign, referringMarketerId } = await this.lockActiveReferral(tx, code);
+        if (referringMarketerId === customerId) {
+          throw new ForbiddenException({ statusCode: 403, code: 'SELF_PROMOTION_FORBIDDEN', message: 'You cannot use your own marketer referral for a purchase.' });
+        }
         const customer = await tx.customerProfile.findUnique({ where: { userId: customerId }, select: { userId: true } });
         if (!customer) {
           throw new ForbiddenException({ statusCode: 403, code: 'FORBIDDEN', message: 'A customer profile is required.' });
@@ -139,16 +142,18 @@ export class ReferralService {
       WHERE user_id = ${campaign.merchantId}::uuid AND verification_status = 'verified' FOR SHARE
     `;
     if (!merchant) throw referralNotFound();
+    let referringMarketerId: string | null = null;
     if (attribution.campaignMarketerId === null) {
       if (campaign.directReferralCode !== code) throw referralNotFound();
     } else {
-      const [approved] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM campaign_marketers WHERE id = ${attribution.campaignMarketerId}::uuid
+      const [approved] = await tx.$queryRaw<{ marketerId: string }[]>`
+        SELECT marketer_id AS "marketerId" FROM campaign_marketers WHERE id = ${attribution.campaignMarketerId}::uuid
         AND campaign_id = ${campaign.id}::uuid AND referral_code = ${code} AND status = 'approved' FOR SHARE
       `;
       if (!approved) throw referralNotFound();
+      referringMarketerId = approved.marketerId;
     }
     if (!available(campaign)) throw campaignEnded();
-    return { attribution, campaign };
+    return { attribution, campaign, referringMarketerId };
   }
 }

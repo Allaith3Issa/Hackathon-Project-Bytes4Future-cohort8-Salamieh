@@ -58,7 +58,7 @@ export class ReferralController {
   @ApiCreatedResponse({ type: OfferQrPassDto, description: 'New active pass' })
   @ApiResponse({ status: 400, type: AuthErrorDto, description: 'VALIDATION_ERROR' })
   @ApiResponse({ status: 401, type: AuthErrorDto, description: 'AUTH_REQUIRED or SESSION_EXPIRED' })
-  @ApiResponse({ status: 403, type: AuthErrorDto, description: 'FORBIDDEN' })
+  @ApiResponse({ status: 403, type: AuthErrorDto, description: 'FORBIDDEN or SELF_PROMOTION_FORBIDDEN' })
   @ApiResponse({ status: 409, type: AuthErrorDto, description: 'CAMPAIGN_ENDED or AMOUNT_OUT_OF_RANGE' })
   @ApiResponse({ status: 429, type: AuthErrorDto, description: 'RATE_LIMITED' })
   async issue(
