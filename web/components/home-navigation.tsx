@@ -14,6 +14,13 @@ const homeLinks = [
 
 export function HomeNavigation({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  if (pathname === "/login" || pathname === "/register") {
+    return (
+      <nav aria-label="التنقل الرئيسي">
+        <Link href="/" className="button-secondary px-3 sm:px-4">الرئيسية</Link>
+      </nav>
+    );
+  }
   if (pathname !== "/") return children;
 
   return (
