@@ -1,11 +1,13 @@
 "use client";
 
+import { useI18n } from "@/components/i18n-provider";
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { signIn } from "@/app/actions";
 
 import { CustomerPasswordField, customerFieldFocus } from "./customer-password-field";
 
 export function SignInForm({ offer, customerOnly }: { offer?: string; customerOnly?: boolean }) {
+  const { t } = useI18n();
   const phoneId = useId();
   const [phone, setPhone] = useState("");
   const [state, submit, pending] = useActionState(signIn.bind(null, { offer, customerOnly }), {});
@@ -22,7 +24,7 @@ export function SignInForm({ offer, customerOnly }: { offer?: string; customerOn
     <>
       <form action={submit} aria-busy={pending} className="grid gap-4">
         <div className="grid gap-1">
-          <label htmlFor={phoneId}>رقم الجوال</label>
+          <label htmlFor={phoneId}>{t("auth.phoneNumber")}</label>
           <input
             ref={phoneInput} id={phoneId} name="phone" type="tel" autoComplete="username" dir="ltr"
             inputMode="tel" maxLength={10} required value={phone}
@@ -33,15 +35,15 @@ export function SignInForm({ offer, customerOnly }: { offer?: string; customerOn
           />
           {state.phoneError
             ? <p id={`${phoneId}-error`} className="text-sm leading-6 text-danger">{state.phoneError}</p>
-            : <p id={`${phoneId}-hint`} className="text-sm leading-6 text-muted">رقم سوري من ١٠ أرقام. مثال <bdi dir="ltr">09XXXXXXXX</bdi></p>}
+            : <p id={`${phoneId}-hint`} className="text-sm leading-6 text-muted">{t("auth.10DigitSyrianPhoneNumberExample")}{" "}<bdi dir="ltr">09XXXXXXXX</bdi></p>}
         </div>
         <CustomerPasswordField inputRef={passwordInput} autoComplete="current-password" error={state.passwordError} />
         {state.error && <p ref={formError} tabIndex={-1} role="alert" className="notice-error">{state.error}</p>}
         <button type="submit" className="button-primary w-full" disabled={pending}>
-          {pending ? "جارٍ تسجيل الدخول…" : "تسجيل الدخول"}
+          {pending ? t("auth.signingIn") : t("common.signIn")}
         </button>
       </form>
-      <span className="sr-only" role="status">{pending ? "جارٍ تسجيل الدخول…" : ""}</span>
+      <span className="sr-only" role="status">{pending ? t("auth.signingIn") : ""}</span>
     </>
   );
 }

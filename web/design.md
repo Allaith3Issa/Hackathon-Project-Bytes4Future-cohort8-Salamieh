@@ -1,6 +1,6 @@
 ---
 name: "مردود | Mardood"
-description: "Shared brand and design tokens for the Mardood Arabic storefront and Android marketer app"
+description: "Shared brand and design tokens for the bilingual Mardood storefront and Android marketer app"
 colors:
   action: "#B54718"
   action-hover: "#943710"
@@ -29,6 +29,8 @@ typography:
     fontFamily: "IBM Plex Sans Arabic"
     fontSize: "14px"
     fontWeight: 600
+  english:
+    fontFamily: "IBM Plex Sans"
 rounded:
   control: "8px"
   panel: "12px"
@@ -76,7 +78,7 @@ Pair status colors with Arabic text. Keep solid Dusty Mauve Pink for accents and
 
 ## Typography
 
-Use **IBM Plex Sans Arabic** throughout. The current web frontend loads **400**, **600**, and **700** locally. Use the same three native font files on Android and load them through `expo-font`. The web package uses CSS and WebFonts. Expo should load the native font files from the official IBM package. [IBM Plex Sans Arabic](https://github.com/IBM/plex/tree/master/packages/plex-sans-arabic) · [Expo font setup](https://docs.expo.dev/develop/user-interface/fonts/)
+Use **IBM Plex Sans Arabic** for Arabic and **IBM Plex Sans** for English. The current web frontend loads **400**, **600**, and **700** locally for both languages. Use the matching native font files on Android and load them through `expo-font`. The web package uses CSS and WebFonts. Expo should load the native font files from the official IBM package. [IBM Plex Sans Arabic](https://github.com/IBM/plex/tree/master/packages/plex-sans-arabic) · [Expo font setup](https://docs.expo.dev/develop/user-interface/fonts/)
 
 | Role | Web reference | Suggested Android starting point |
 | --- | --- | --- |

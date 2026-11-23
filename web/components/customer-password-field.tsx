@@ -1,5 +1,6 @@
 "use client";
 
+import { useI18n } from "@/components/i18n-provider";
 import { useId, useState, type Ref } from "react";
 
 export const customerFieldFocus = "focus-visible:outline-offset-1 aria-invalid:bg-danger/5 aria-invalid:focus-visible:outline-danger";
@@ -12,14 +13,16 @@ interface CustomerPasswordFieldProps {
   error?: string;
 }
 
-export function CustomerPasswordField({ inputRef, name = "password", label = "كلمة المرور", autoComplete, error }: CustomerPasswordFieldProps) {
+export function CustomerPasswordField({ inputRef, name = "password", label, autoComplete, error }: CustomerPasswordFieldProps) {
+  const { t } = useI18n();
+  const fieldLabel = label ?? t("auth.password");
   const id = useId();
   const [visible, setVisible] = useState(false);
-  const toggle = visible ? "إخفاء" : "إظهار";
+  const toggle = visible ? t("auth.hidePassword") : t("auth.showPassword");
 
   return (
     <div className="grid gap-1">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}>{fieldLabel}</label>
       <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">
         <input
           ref={inputRef} id={id} name={name} type={visible ? "text" : "password"}
@@ -28,7 +31,7 @@ export function CustomerPasswordField({ inputRef, name = "password", label = "ك
           aria-invalid={Boolean(error)} aria-describedby={error ? `${id}-error` : undefined}
         />
         <button
-          type="button" aria-controls={id} aria-label={`${toggle} ${label}`}
+          type="button" aria-controls={id} aria-label={t("auth.togglePassword", { action: toggle, label: fieldLabel })}
           onClick={() => setVisible((shown) => !shown)} data-visible={visible}
           className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-dusty-mauve bg-mauve text-sm font-semibold text-ink hover:border-ink focus-visible:outline-offset-1 data-[visible=true]:border-ink data-[visible=true]:bg-ink data-[visible=true]:text-white"
         >

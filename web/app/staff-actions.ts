@@ -1,7 +1,8 @@
 "use server";
 
+import { getI18n, redirectLocalized } from "@/lib/i18n-server";
+import { localizedPath } from "@/lib/locale";
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { ApiError, apiRequest } from "@/lib/api";
 import type { AuthSession } from "@/lib/contract";
 import { authenticatedRequest, saveSession } from "@/lib/session";
@@ -11,7 +12,7 @@ import type {
 import { parseMoney, parsePercent, parsePositiveMoney, staffError } from "@/lib/staff-ui";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const KEY_ERROR = "تعذّر تجهيز الطلب. حدّث الصفحة وحاول مرة أخرى.";
+const KEY_ERROR = "auth.weCouldnTPrepareTheRequest";
 const methods = ["cash", "sham_cash", "syriatel_cash", "bank_transfer"];
 const text = (d: FormData, k: string) => String(d.get(k) ?? "").trim();
 const digits = (v: string) => v.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632));
@@ -22,23 +23,24 @@ export interface StaffSignInState { error?: string; phoneError?: string; passwor
 export async function staffSignIn(
   kind: "admin" | "merchant", _state: StaffSignInState, data: FormData,
 ): Promise<StaffSignInState> {
+  const { t } = await getI18n();
   const phone = digits(text(data, "phone"));
   const password = String(data.get("password") ?? "");
-  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من 10 أرقام يبدأ بـ 09.";
-  const passwordError = password ? undefined : "أدخل كلمة المرور.";
+  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : t("auth.syrianPhone");
+  const passwordError = password ? undefined : t("auth.passwordRequired");
   if (phoneError || passwordError) return { phoneError, passwordError };
   try {
     const session = await apiRequest<AuthSession>(kind === "admin" ? "/auth/admin/login" : "/auth/login", {
       method: "POST", body: { phone, password },
     });
     if (!session.user.roles.includes(kind)) {
-      return { error: kind === "admin" ? "هذا الحساب ليس حساب إدارة." : "هذا الحساب ليس حساب تاجر." };
+      return { error: kind === "admin" ? t("auth.thisAccountDoesNotHaveThe") : t("auth.thisAccountDoesNotHaveThe2") };
     }
     await saveSession(session);
   } catch (error) {
-    return { error: staffError(error) };
+    return { error: staffError(error, t) };
   }
-  redirect(kind === "admin" ? "/admin/topups" : "/merchant/campaigns/new");
+  return redirectLocalized(kind === "admin" ? "/admin/topups" : "/merchant/campaigns/new");
 }
 
 
@@ -48,27 +50,28 @@ export interface TopupState {
 }
 
 export async function topUp(_state: TopupState, data: FormData): Promise<TopupState> {
+  const { t, locale } = await getI18n();
   const key = text(data, "key");
   const merchantId = text(data, "merchantId");
   const amount = parseMoney(text(data, "amount"));
   const method = text(data, "paymentMethod");
   const note = text(data, "note");
-  if (!uuid.test(key)) return { error: KEY_ERROR };
+  if (!uuid.test(key)) return { error: t(KEY_ERROR) };
   const errors: NonNullable<TopupState["errors"]> = {};
-  if (!merchantId) errors.merchantId = "اختر التاجر.";
-  if (!amount) errors.amount = "أدخل مبلغاً صحيحاً أكبر من صفر.";
-  if (!note) errors.note = "أدخل مرجع الدفع.";
-  if (!methods.includes(method)) return { error: "اختر طريقة الدفع." };
+  if (!merchantId) errors.merchantId = t("validation.selectAMerchant");
+  if (!amount) errors.amount = t("validation.enterAnAmountGreaterThanZero");
+  if (!note) errors.note = t("validation.enterAPaymentReference");
+  if (!methods.includes(method)) return { error: t("validation.selectAPaymentMethod") };
   if (Object.keys(errors).length) return { errors };
   try {
     const result = await authenticatedRequest<AdminTopupResult>(
       `/admin/merchants/${encodeURIComponent(merchantId)}/topups`,
       { method: "POST", idempotencyKey: key, body: { amountSyp: amount, paymentMethod: method, referenceNote: note } },
     );
-    revalidatePath("/admin/topups");
+    revalidatePath(localizedPath("/admin/topups", locale, true));
     return { result };
   } catch (error) {
-    return { error: staffError(error) };
+    return { error: staffError(error, t) };
   }
 }
 
@@ -80,6 +83,7 @@ export interface CampaignState {
 }
 
 export async function campaignAction(state: CampaignState, data: FormData): Promise<CampaignState> {
+  const { t } = await getI18n();
   const launch = text(data, "intent") === "launch";
   const key = text(data, "key");
   const preview = state.preview?.key === key ? state.preview : undefined;
@@ -88,23 +92,23 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
   const maxItems = /^[0-9]{1,10}$/.test(digits(text(data, "maxItems"))) ? Number(digits(text(data, "maxItems"))) : null;
   const discount = parsePercent(text(data, "discountPercent"));
   const errors: Record<string, string> = {};
-  if (!price) errors.originalPriceSyp = "أدخل سعراً صحيحاً أكبر من صفر.";
-  if (discount === null) errors.discountPercent = "أدخل نسبة من 0 إلى 100.";
-  if (commission === null) errors.commissionSyp = "أدخل عمولة صحيحة (يمكن أن تكون صفراً).";
-  if (!maxItems || maxItems > 2147483647) errors.maxItems = "أدخل عدد قطع صحيحاً أكبر من صفر.";
+  if (!price) errors.originalPriceSyp = t("validation.enterAPriceGreaterThanZero");
+  if (discount === null) errors.discountPercent = t("validation.enterAPercentageBetween0And");
+  if (commission === null) errors.commissionSyp = t("validation.enterAValidCommissionItCan");
+  if (!maxItems || maxItems > 2147483647) errors.maxItems = t("validation.enterAWholeNumberOfItems");
   const productName = text(data, "productName");
   const description = text(data, "description");
   const imageUrl = text(data, "imageUrl");
   const endsRaw = text(data, "endsAt");
   const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; 
   if (launch) {
-    if (!productName) errors.productName = "أدخل اسم المنتج.";
-    if (!description) errors.description = "أدخل وصفاً للمنتج.";
-    if (!/^https?:\/\/\S+$/i.test(imageUrl)) errors.imageUrl = "أدخل رابط صورة يبدأ بـ http أو https.";
-    if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= Date.now()) errors.endsAt = "اختر موعد انتهاء في المستقبل.";
+    if (!productName) errors.productName = t("validation.enterTheProductName");
+    if (!description) errors.description = t("validation.enterAProductDescription");
+    if (!/^https?:\/\/\S+$/i.test(imageUrl)) errors.imageUrl = t("validation.enterAnImageUrlStartingWith");
+    if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= Date.now()) errors.endsAt = t("validation.chooseAnEndDateInThe");
   }
   if (Object.keys(errors).length) return { preview, errors };
-  if (!uuid.test(key)) return { error: KEY_ERROR };
+  if (!uuid.test(key)) return { error: t(KEY_ERROR) };
   const base = {
     campaignType: "product", originalPriceSyp: price, discountPercent: discount,
     commission: { type: "fixed", amountSyp: commission }, maxItems,
@@ -118,9 +122,9 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
       method: "POST", idempotencyKey: key,
       body: { ...base, productName, description, imageUrl, endsAt: endsAt!.toISOString(), joinMode: "open" },
     });
-    redirect(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
+    return redirectLocalized(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
   } catch (error) {
-    if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error) };
+    if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error, t) };
     throw error;
   }
 }
@@ -128,34 +132,37 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
 export interface CloseState { campaign?: MerchantCampaign; error?: string }
 
 export async function closeCampaign(id: string, _state: CloseState): Promise<CloseState> {
+  const { t, locale } = await getI18n();
   const path = `/merchant/campaigns/${encodeURIComponent(id)}` as const;
   try {
     const campaign = await authenticatedRequest<MerchantCampaign>(`${path}/close`, { method: "POST" });
-    revalidatePath(path);
+    revalidatePath(localizedPath(path, locale, true));
     return { campaign };
   } catch (error) {
-    return { error: staffError(error) };
+    return { error: staffError(error, t) };
   }
 }
 
 
 export async function lookupOffer(code: string): Promise<{ lookup?: ScannerLookup; error?: string }> {
+  const { t } = await getI18n();
   const value = code.trim();
-  if (!value || value.length > 200) return { error: "أدخل الرمز الظاهر على بطاقة الزبون." };
+  if (!value || value.length > 200) return { error: t("validation.enterTheCodeShownOnThe") };
   try {
     return { lookup: await authenticatedRequest<ScannerLookup>("/merchant/scanner/lookup", { method: "POST", body: { code: value } }) };
   } catch (error) {
-    return { error: staffError(error) };
+    return { error: staffError(error, t) };
   }
 }
 
 export async function redeemOffer(code: string, key: string): Promise<{ result?: OfferRedeemResult; error?: string; terminal?: boolean }> {
-  if (!uuid.test(key)) return { error: KEY_ERROR, terminal: true };
+  const { t } = await getI18n();
+  if (!uuid.test(key)) return { error: t(KEY_ERROR), terminal: true };
   try {
     return { result: await authenticatedRequest<OfferRedeemResult>("/merchant/scanner/redeem-offer", { method: "POST", idempotencyKey: key, body: { code: code.trim() } }) };
   } catch (error) {
     const uncertain = error instanceof ApiError && (error.status >= 500 || error.code === "RATE_LIMITED");
-    return { error: staffError(error), terminal: !uncertain };
+    return { error: staffError(error, t), terminal: !uncertain };
   }
 }
 
@@ -164,16 +171,17 @@ export type VoucherOutcome = "uncertain" | "exceeds" | "rejected";
 export async function redeemVoucher(
   code: string, billTotal: string, key: string,
 ): Promise<{ result?: VoucherRedeemResult; error?: string; outcome?: VoucherOutcome }> {
+  const { t } = await getI18n();
   const bill = parsePositiveMoney(billTotal);
-  if (!bill) return { error: "أدخل إجمالي فاتورة أكبر من صفر، حتى منزلتين عشريتين." };
-  if (!uuid.test(key)) return { error: KEY_ERROR, outcome: "rejected" };
+  if (!bill) return { error: t("validation.enterABillTotalGreaterThan") };
+  if (!uuid.test(key)) return { error: t(KEY_ERROR), outcome: "rejected" };
   try {
     return { result: await authenticatedRequest<VoucherRedeemResult>("/merchant/scanner/redeem-voucher", { method: "POST", idempotencyKey: key, body: { code: code.trim(), billTotalSyp: bill } }) };
   } catch (error) {
     if (error instanceof ApiError) {
-      if (error.status >= 500 || error.code === "RATE_LIMITED") return { error: staffError(error), outcome: "uncertain" };
-      if (error.code === "VOUCHER_EXCEEDS_BILL") return { error: staffError(error), outcome: "exceeds" };
+      if (error.status >= 500 || error.code === "RATE_LIMITED") return { error: staffError(error, t), outcome: "uncertain" };
+      if (error.code === "VOUCHER_EXCEEDS_BILL") return { error: staffError(error, t), outcome: "exceeds" };
     }
-    return { error: staffError(error), outcome: "rejected" };
+    return { error: staffError(error, t), outcome: "rejected" };
   }
 }

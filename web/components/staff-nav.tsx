@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/localized-link";
 
 export function StaffNav({ label, items }: { label: string; items: [string, string][] }) {
   return (

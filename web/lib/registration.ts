@@ -1,3 +1,5 @@
+import type { Translate } from "./i18n";
+
 export const DEFAULT_ROLES = ["customer", "marketer", "merchant"] as const;
 export type RegistrationRole = (typeof DEFAULT_ROLES)[number];
 
@@ -17,7 +19,7 @@ function formText(data: FormData, field: string) {
   return typeof value === "string" ? value : "";
 }
 
-export function validateRegistration(data: FormData) {
+export function validateRegistration(data: FormData, t: Translate) {
   const selected = data.getAll("roles");
   const roles = DEFAULT_ROLES.filter((role) => selected.includes(role));
   const name = formText(data, "name").trim();
@@ -30,22 +32,22 @@ export function validateRegistration(data: FormData) {
   } : undefined;
 
   const errors: RegistrationErrors = {};
-  if (!selected.length) errors.roles = "اختر دوراً واحداً على الأقل للمتابعة.";
-  else if (selected.length !== roles.length) errors.roles = "تحقّق من الأدوار المختارة.";
-  if (!name) errors.name = "أدخل اسمك الكامل.";
-  else if (name.length > 120) errors.name = "الاسم الكامل يجب ألّا يتجاوز ١٢٠ حرفاً.";
-  if (phone.length !== 10 || !/^09[0-9]{8}$/.test(phone)) errors.phone = "أدخل رقم جوال سورياً من ١٠ أرقام يبدأ بـ 09.";
-  if (!password) errors.password = "أدخل كلمة المرور.";
+  if (!selected.length) errors.roles = t("registration.selectAtLeastOneRoleTo");
+  else if (selected.length !== roles.length) errors.roles = t("registration.checkTheSelectedRoles");
+  if (!name) errors.name = t("validation.enterYourFullName");
+  else if (name.length > 120) errors.name = t("validation.yourFullNameMustBe120");
+  if (phone.length !== 10 || !/^09[0-9]{8}$/.test(phone)) errors.phone = t("validation.syrianPhone");
+  if (!password) errors.password = t("auth.passwordRequired");
   else if (new TextEncoder().encode(password).length > 72) {
-    errors.password = "كلمة المرور تتجاوز حدّ ٧٢ بايت. اختصرها، فبعض الأحرف تُحسب بأكثر من بايت.";
+    errors.password = t("validation.yourPasswordIsMoreThan72");
   }
-  if (!confirmation) errors.confirmation = "أعد إدخال كلمة المرور للتأكيد.";
-  else if (password !== confirmation) errors.confirmation = "كلمتا المرور غير متطابقتين.";
+  if (!confirmation) errors.confirmation = t("validation.reEnterYourPasswordToConfirm");
+  else if (password !== confirmation) errors.confirmation = t("validation.thePasswordsDonTMatch");
   if (shop) {
-    if (!shop.name) errors.shopName = "أدخل اسم المتجر.";
-    else if (shop.name.length > 120) errors.shopName = "اسم المتجر يجب ألّا يتجاوز ١٢٠ حرفاً.";
-    if (!shop.details) errors.shopDetails = "أدخل وصف المتجر.";
-    else if (shop.details.length > 2000) errors.shopDetails = "وصف المتجر يجب ألّا يتجاوز ٢٠٠٠ حرف.";
+    if (!shop.name) errors.shopName = t("validation.enterTheStoreName");
+    else if (shop.name.length > 120) errors.shopName = t("validation.theStoreNameMustBe120");
+    if (!shop.details) errors.shopDetails = t("validation.enterTheStoreDescription");
+    else if (shop.details.length > 2000) errors.shopDetails = t("validation.theStoreDescriptionMustBe2");
   }
 
   return { errors, body: { name, phone, password, roles, ...(shop ? { shop } : {}) } };
