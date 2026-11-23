@@ -19,6 +19,7 @@ const fixtureId = (key: number) => `aff111a7-e000-4000-8000-${String(key).padSta
 const adminId = fixtureId(1);
 const marker = { actorId: adminId, operation: 'demo.seed.v1', requestKey: fixtureId(90) };
 const reserve = 435_000n;
+const developmentDatabaseName = 'affiliate_marketing_dev';
 
 class SeedError extends Error {}
 
@@ -27,20 +28,33 @@ function readConfig() {
     throw new SeedError('Set NODE_ENV to development or test to run the demo seed.');
   }
 
-  const url = URL.parse(process.env.DEMO_SEED_DATABASE_URL ?? '');
+  const seedDevelopment = process.env.ALLOW_DEV_DEMO_SEED === '1';
+  if (seedDevelopment && process.env.NODE_ENV !== 'development') {
+    throw new SeedError('Seeding the development database requires NODE_ENV=development.');
+  }
+
+  const url = URL.parse((seedDevelopment ? process.env.DATABASE_URL : process.env.DEMO_SEED_DATABASE_URL) ?? '');
   const database = url?.pathname.slice(1) ?? '';
   if (
     !url ||
     !['postgresql:', 'postgres:'].includes(url.protocol) ||
-    !['127.0.0.1', '[::1]'].includes(url.hostname) ||
-    !/^affiliate_marketing_(?:demo|seed_test)(?:_[a-z0-9]+)*$/.test(database) ||
-    url.search ||
+    !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) ||
     url.hash
+  ) {
+    throw new SeedError('The seed database URL must use loopback PostgreSQL.');
+  }
+  if (seedDevelopment) {
+    if (database !== developmentDatabaseName ||
+      [...url.searchParams].some(([key, value]) => key !== 'schema' || value !== 'public')) {
+      throw new SeedError('Development seeding requires DATABASE_URL for affiliate_marketing_dev on the public schema.');
+    }
+  } else if (
+    !/^affiliate_marketing_(?:demo|seed_test)(?:_[a-z0-9]+)*$/.test(database) || url.search
   ) {
     throw new SeedError('DEMO_SEED_DATABASE_URL must point to a dedicated loopback demo or seed-test database without URL options.');
   }
   const developmentDatabase = URL.parse(process.env.DATABASE_URL ?? '')?.pathname;
-  if (developmentDatabase && decodeURIComponent(developmentDatabase) === url.pathname) {
+  if (!seedDevelopment && developmentDatabase && decodeURIComponent(developmentDatabase) === url.pathname) {
     throw new SeedError('The demo seed database must differ from DATABASE_URL.');
   }
 
@@ -52,11 +66,11 @@ function readConfig() {
   if (Buffer.byteLength(adminPassword, 'utf8') > 72 || Buffer.byteLength(accountPassword, 'utf8') > 72) {
     throw new SeedError('Demo passwords must be at most 72 UTF-8 bytes for bcrypt.');
   }
-  return { url, database, adminPassword, accountPassword };
+  return { url, database, seedDevelopment, adminPassword, accountPassword };
 }
 
 async function seed() {
-  const { url, database, adminPassword, accountPassword } = readConfig();
+  const { url, database, seedDevelopment, adminPassword, accountPassword } = readConfig();
   const prisma = new PrismaClient({
     adapter: new PrismaPg({ connectionString: url.href, connectionTimeoutMillis: 5000 }),
   });
@@ -72,8 +86,47 @@ async function seed() {
 
       // Serialize seed attempts before checking the committed marker.
       await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(7101, 3)`;
-      if (await tx.idempotencyRecord.findUnique({ where: { actorId_operation_requestKey: marker } })) {
+      const seeded = await tx.idempotencyRecord.findUnique({ where: { actorId_operation_requestKey: marker } });
+      if (seedDevelopment && seeded) {
+        const users = await tx.user.findMany({
+          where: { id: { in: accounts.map(({ key }) => fixtureId(key)) } },
+          select: { id: true, phone: true, isAdmin: true, isCustomer: true, isMarketer: true, merchantProfile: { select: { userId: true } } },
+        });
+        const knownIdentities = accounts.every(({ key, role }) => {
+          const user = users.find(({ id }) => id === fixtureId(key));
+          return user?.phone === `099910000${key}` &&
+            user.isAdmin === (role === 'admin') && user.isCustomer === (role === 'customer') &&
+            user.isMarketer === (role === 'marketer') && Boolean(user.merchantProfile) === (role === 'merchant');
+        });
+        if (seeded.requestFingerprint !== 'demo-seed-v1' || seeded.responseStatus !== 201 || !knownIdentities) {
+          throw new SeedError('Development seed marker or demo identities are inconsistent. No demo records were changed.');
+        }
+      }
+      if (seeded) {
         return 'already seeded';
+      }
+
+      if (seedDevelopment) {
+        // Hold writes until the empty-database check and initial seed commit together.
+        await tx.$executeRaw`
+          LOCK TABLE users, user_sessions, merchant_profiles, customer_profiles, wallets,
+            merchant_topups, campaigns, campaign_marketers, referral_clicks, offer_qr_passes,
+            sales, money_movements, idempotency_records IN SHARE ROW EXCLUSIVE MODE
+        `;
+        const [{ populated }] = await tx.$queryRaw<{ populated: boolean }[]>`
+          SELECT EXISTS (
+            SELECT 1 FROM users UNION ALL SELECT 1 FROM user_sessions
+            UNION ALL SELECT 1 FROM merchant_profiles UNION ALL SELECT 1 FROM customer_profiles
+            UNION ALL SELECT 1 FROM wallets UNION ALL SELECT 1 FROM merchant_topups
+            UNION ALL SELECT 1 FROM campaigns UNION ALL SELECT 1 FROM campaign_marketers
+            UNION ALL SELECT 1 FROM referral_clicks UNION ALL SELECT 1 FROM offer_qr_passes
+            UNION ALL SELECT 1 FROM sales UNION ALL SELECT 1 FROM money_movements
+            UNION ALL SELECT 1 FROM idempotency_records
+          ) AS populated
+        `;
+        if (populated) {
+          throw new SeedError('Development seeding requires empty application tables or a verified completed demo seed.');
+        }
       }
 
       for (const account of accounts) {

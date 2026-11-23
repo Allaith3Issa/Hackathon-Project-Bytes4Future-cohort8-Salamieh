@@ -18,14 +18,16 @@
     "predb:seed": "npm run build",
     "db:seed": "node --env-file-if-exists=.env dist/prisma/seed.js",
     "pretest": "npm run build",
-    "test": "node --test test/health.test.cjs"
+    "test": "node --test test/*.test.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.0",
     "@nestjs/core": "^11.0.0",
+    "@nestjs/jwt": "^11.0.0",
     "@nestjs/platform-express": "^11.0.0",
     "@nestjs/swagger": "^11.0.0",
+    "@nestjs/throttler": "^6.0.0",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "bcrypt": "^6.0.0",
