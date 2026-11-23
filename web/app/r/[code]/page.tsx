@@ -93,7 +93,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
           ) : (
             <section className="surface p-5 sm:p-6">
               <h2 className="text-lg font-bold sm:text-xl">سجّل الدخول لإصدار بطاقة الخصم</h2>
-              <div className="mt-4"><SignInForm returnTo={`/r/${code}`} /></div>
+              <div className="mt-4"><SignInForm offer={code} customerOnly /></div>
               <p className="mt-4 text-center text-sm leading-6 text-muted">
                 ليس لديك حساب؟ <Link className="text-link" href={`/register?offer=${code}`}>إنشاء حساب</Link>
               </p>

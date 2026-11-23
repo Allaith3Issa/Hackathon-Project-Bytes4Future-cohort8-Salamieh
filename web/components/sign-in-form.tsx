@@ -5,10 +5,10 @@ import { signIn } from "@/app/actions";
 
 import { CustomerPasswordField, customerFieldFocus } from "./customer-password-field";
 
-export function SignInForm({ returnTo = "/customer" }: { returnTo?: string }) {
+export function SignInForm({ offer, customerOnly }: { offer?: string; customerOnly?: boolean }) {
   const phoneId = useId();
   const [phone, setPhone] = useState("");
-  const [state, submit, pending] = useActionState(signIn.bind(null, returnTo), {});
+  const [state, submit, pending] = useActionState(signIn.bind(null, { offer, customerOnly }), {});
   const phoneInput = useRef<HTMLInputElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
   const formError = useRef<HTMLParagraphElement>(null);

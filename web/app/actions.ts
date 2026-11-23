@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { redirect } from "next/navigation";
 import { apiRequest, ApiError } from "@/lib/api";
 import type { AuthSession, OfferQrPass } from "@/lib/contract";
+import { publicAccountDestination } from "@/lib/public-account-destination";
 import { authenticatedRequest, clearSession, saveSession, sessionTokens } from "@/lib/session";
 import { errorMessage, validReferral } from "@/lib/ui";
 
@@ -14,7 +15,7 @@ export interface SignInState {
 }
 
 export async function signIn(
-  returnTo: string,
+  { offer, customerOnly }: { offer?: string; customerOnly?: boolean },
   _state: SignInState,
   data: FormData,
 ): Promise<SignInState> {
@@ -23,14 +24,18 @@ export async function signIn(
   const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من 10 أرقام يبدأ بـ 09.";
   const passwordError = password ? undefined : "أدخل كلمة المرور.";
   if (phoneError || passwordError) return { phoneError, passwordError };
+  let destination: string;
   try {
     const session = await apiRequest<AuthSession>("/auth/login", {
       method: "POST",
       body: { phone, password },
     });
-    if (!session.user.roles.includes("customer")) {
+    if (customerOnly && !session.user.roles.includes("customer")) {
       return { error: "سجّل الدخول باستخدام حساب عميل للوصول إلى عروضك." };
     }
+    const target = publicAccountDestination(session.user.roles, offer);
+    if (!target) return { error: "لا يملك هذا الحساب دوراً يتيح تسجيل الدخول من هذه الصفحة." };
+    destination = target;
     await saveSession(session);
   } catch (error) {
     if (error instanceof ApiError && error.code === "VALIDATION_ERROR") {
@@ -44,7 +49,7 @@ export async function signIn(
     }
     return { error: errorMessage(error) };
   }
-  redirect(returnTo.startsWith("/r/") && validReferral(returnTo.slice(3)) ? returnTo : "/customer");
+  redirect(destination);
 }
 
 export async function signOut() {

@@ -90,6 +90,7 @@ export default async function Home() {
   const primaryAction = roles.includes("customer") ? { href: "/customer", label: "عرض الكاش باك" }
     : roles.includes("merchant") ? { href: "/merchant/campaigns", label: "لوحة التاجر" }
     : roles.includes("admin") ? { href: "/admin/topups", label: "الإدارة" }
+    : roles.includes("marketer") ? null
     : { href: "/login", label: "تسجيل الدخول" };
   return (
     <>
@@ -105,9 +106,11 @@ export default async function Home() {
               افتح رابط العرض، وأبرز بطاقة الخصم عند الدفع نقداً. تابع الكاش باك من حسابك بعد تسجيل الشراء.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-x-5">
-              <Link href={primaryAction.href} className="button-primary">
-                {primaryAction.label}
-              </Link>
+                {primaryAction ? (
+                  <Link href={primaryAction.href} className="button-primary">{primaryAction.label}</Link>
+                ) : (
+                  <p className="text-sm font-semibold text-muted">أنت مسجّل الدخول بحساب مسوّق.</p>
+                )}
               <button
                 type="button"
                 {...{ command: "show-modal", commandfor: "how-it-works-dialog" }}
