@@ -5,6 +5,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { URL } = require('node:url');
 const bcrypt = require('bcrypt');
 
+const { AbortSignal } = globalThis;
 const databaseUrl = process.env.MARKETER_CAMPAIGN_INTEGRATION_DATABASE_URL;
 
 test('Step 08 marketer campaign discovery and joining on isolated PostgreSQL', { skip: !databaseUrl, timeout: 30000 }, async (t) => {
@@ -190,13 +191,13 @@ test('Step 08 marketer campaign discovery and joining on isolated PostgreSQL', {
       assert.ok(blocked, 'Expected the join connection to wait on the campaign row');
     } finally {
       release();
-      await closing;
-      if (joining) {
-        const [result] = await joining;
-        if (result.status === 'rejected') throw result.reason;
-        await fail(result.value, 409, 'CAMPAIGN_ENDED');
-      }
+      // Drain both operations without replacing any failure from the lock check.
+      await Promise.allSettled([closing, joining]);
     }
+    await closing;
+    const [result] = await joining;
+    if (result.status === 'rejected') throw result.reason;
+    await fail(result.value, 409, 'CAMPAIGN_ENDED');
     assert.equal(await db.campaignMarketer.count({ where: { campaignId: race.id } }), 0);
     assert.equal(await db.moneyMovement.count({ where: { campaignId: race.id, kind: 'campaign_reserve_unlock' } }), 1);
     assert.equal((await db.campaign.findUniqueOrThrow({ where: { id: race.id } })).status, 'ended');
