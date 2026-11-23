@@ -179,12 +179,12 @@ test('Step 04B session HTTP and PostgreSQL integration', { skip: !databaseUrl },
     current = await response.json();
     assert.deepEqual(Object.keys(current).sort(), ['accessToken', 'expiresInSeconds', 'refreshToken', 'user']);
     assert.deepEqual(current.user, original.user);
-    assert.equal(current.expiresInSeconds, 900);
+    assert.equal(current.expiresInSeconds, 1800);
     assert.ok(current.refreshToken !== original.refreshToken && current.accessToken !== original.accessToken);
     const claims = await verify(current.accessToken);
     assert.equal(claims.sub, first.id);
     assert.equal(claims.sid, initial.id);
-    assert.equal(claims.exp - claims.iat, 900);
+    assert.equal(claims.exp - claims.iat, 1800);
     const after = await readSession(initial.id);
     assert.ok(after.refreshTokenHash === createHash('sha256').update(current.refreshToken).digest('hex'));
     assert.deepEqual(after.lastActivityAt, initial.lastActivityAt);

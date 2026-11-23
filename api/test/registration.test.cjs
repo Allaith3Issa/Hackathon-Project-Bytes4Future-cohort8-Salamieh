@@ -77,7 +77,7 @@ test('Step 04D registration HTTP and PostgreSQL integration', { skip: !databaseU
     const session = await response.json();
     assert.deepEqual(Object.keys(session).sort(), ['accessToken', 'expiresInSeconds', 'refreshToken', 'user']);
     assert.deepEqual(Object.keys(session.user).sort(), ['createdAt', 'customer', 'id', 'merchant', 'name', 'phone', 'roles']);
-    assert.equal(session.expiresInSeconds, 900);
+    assert.equal(session.expiresInSeconds, 1800);
     assert.equal(session.user.name, input.name);
     assert.equal(session.user.phone, input.phone);
     assert.deepEqual(session.user.roles, ['customer', 'marketer', 'merchant']);
@@ -97,7 +97,7 @@ test('Step 04D registration HTTP and PostgreSQL integration', { skip: !databaseU
     assert.equal(storedSession.refreshTokenHash, createHash('sha256').update(session.refreshToken).digest('hex'));
     const claims = await app.get(JwtService).verifyAsync(session.accessToken, { secret, algorithms: ['HS256'] });
     assert.equal(claims.sid, storedSession.id);
-    assert.equal(claims.exp - claims.iat, 900);
+    assert.equal(claims.exp - claims.iat, 1800);
     const me = await fetch(`${base}/api/v1/auth/me`, { headers: { authorization: `Bearer ${session.accessToken}` } });
     assert.equal(me.status, 200);
     assert.deepEqual(await me.json(), session.user);

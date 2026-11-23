@@ -67,13 +67,13 @@ test('Step 04A login HTTP contract', async (t) => {
   const credentials = (account) => ({ phone: account.phone, password });
   const invalidCredentials = { statusCode: 401, code: 'INVALID_CREDENTIALS', message: 'Invalid phone number or password.' };
 
-  await t.test('regular login maps the Account, signs a 900-second JWT, and stores only the refresh hash', async () => {
+  await t.test('regular login maps the Account, signs a 30-minute JWT, and stores only the refresh hash', async () => {
     const response = await post('login', credentials(regular));
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     const body = await response.json();
     assert.deepEqual(Object.keys(body).sort(), ['accessToken', 'expiresInSeconds', 'refreshToken', 'user']);
-    assert.equal(body.expiresInSeconds, 900);
+    assert.equal(body.expiresInSeconds, 1800);
     assert.deepEqual(body.user, {
       id: regular.id,
       name: regular.name,
@@ -89,7 +89,7 @@ test('Step 04A login HTTP contract', async (t) => {
     assert.equal(payload.sub, regular.id);
     assert.equal(payload.sid, session.id);
     assert.deepEqual(payload.roles, body.user.roles);
-    assert.equal(payload.exp - payload.iat, 900);
+    assert.equal(payload.exp - payload.iat, 1800);
     assert.match(body.refreshToken, /^[A-Za-z0-9_-]{43}$/);
     assert.equal(session.refreshTokenHash, createHash('sha256').update(body.refreshToken).digest('hex'));
     assert.ok(!JSON.stringify(session).includes(body.refreshToken));
