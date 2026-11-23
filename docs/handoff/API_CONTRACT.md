@@ -451,7 +451,7 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/merchants` | Admin | Pagination, optional `verificationStatus` | `200 Page<AdminMerchant>` |
 | `PATCH /admin/merchants/{merchantId}/verification` | Admin | `{ status: "verified" \| "rejected", contractReference?: string }` | `200 AdminMerchant` |
 | `POST /admin/merchants/{merchantId}/topups` | Admin | `{ amountSyp, paymentMethod, referenceNote }` + `Idempotency-Key` | `201 AdminTopupResult` |
-| `GET /admin/topups` | Admin | Pagination, optional `merchantId` | `200 Page<AdminTopupResult>` |
+| `GET /admin/topups` | Admin | Pagination, optional `merchantId` | `200 Page<AdminTopupHistoryEntry>` |
 | `GET /admin/payouts` | Admin | Pagination, optional `status` | `200 Page<PayoutRequest>` |
 | `POST /admin/payouts/{payoutId}/upload-receipt` | Admin | Multipart form image (`receipt`) | `200 { transferReceiptUrl: string }` |
 | `PATCH /admin/payouts/{payoutId}/mark-transferred` | Admin | `{ transferReference, transferReceiptUrl }` | `200 PayoutRequest` |
@@ -460,6 +460,10 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/users` | Admin | Pagination, optional `role` | `200 Page<AdminUser>` |
 | `GET /admin/campaigns` | Admin | Pagination, optional `status` | `200 Page<AdminCampaign>` |
 | `GET /admin/overview` | Admin | None | `200 AdminOverview` |
+
+For the MVP, merchant verification changes `pending` to `verified` or `rejected`. Repeating the same decision returns `200`. Supplying `contractReference` sets it, and omitting it preserves the current value. Reversing a decided status returns `409 INVALID_STATUS_TRANSITION`. When conflicting decisions arrive concurrently, the first committed decision wins.
+
+Top-ups record confirmed offline payments to verified merchants. The amount must be a positive safe integer in new SYP minor units, and `referenceNote` must be nonblank and at most 256 characters. The post-credit balance is captured when the wallet is credited. POST always returns a number. History returns that stored balance and uses `null` only for legacy records whose post-credit balance cannot be verified. History is ordered by creation time descending, then top-up ID descending.
 
 ### Payout accounting (future)
 
@@ -479,6 +483,10 @@ type AdminTopupResult = {
   referenceNote: string;
   merchantNewAvailableBalanceSyp: number;
   createdAt: string;
+};
+
+type AdminTopupHistoryEntry = Omit<AdminTopupResult, 'merchantNewAvailableBalanceSyp'> & {
+  merchantNewAvailableBalanceSyp: number | null;
 };
 
 type AdminUser = Pick<Account, 'id' | 'name' | 'phone' | 'roles' | 'createdAt'>;
