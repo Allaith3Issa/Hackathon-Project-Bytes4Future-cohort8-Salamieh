@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
 
-export const ACCESS_TOKEN_SECONDS = 900;
+export const ACCESS_TOKEN_SECONDS = 30 * 60;
 const roles = ['admin', 'customer', 'marketer', 'merchant'] as const;
 const verificationStatuses = ['pending', 'verified', 'rejected'] as const;
 export type Role = (typeof roles)[number];
