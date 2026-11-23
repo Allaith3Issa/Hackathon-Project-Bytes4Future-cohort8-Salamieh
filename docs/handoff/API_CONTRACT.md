@@ -467,6 +467,8 @@ Top-ups record confirmed offline payments to verified merchants. The amount must
 
 ### Payout accounting (future)
 
+Marketer payouts are disabled during the three-day MVP. `MarketerWallet.totalConfirmedPaidOutSyp` remains a number and is `0` while confirmed payouts cannot exist. When payouts are enabled, derive the total from verified, persisted confirmed payouts. Never estimate an unavailable historical total.
+
 - Requesting a payout moves funds from available to pending. Only a `pending_review` request can be rejected before transfer. Rejection releases the hold once.
 - After sending funds, the admin records the receipt and a transfer reference unique per payment method. Moving to `transferred` clears the pending hold and records the external cash outflow in the same transaction. Repeating the same recorded transfer returns its existing result. Conflicting transfers or invalid transitions return `409 INVALID_STATUS_TRANSITION`.
 - The marketer can confirm or dispute a transferred payout. A periodic reconciliation marks still-transferred payouts confirmed once 72 hours have passed. Serialize transitions on the payout row and apply any due auto-confirmation before accepting a dispute. Confirmation and dispute change the payout status and preserve the receipt. The wallet was settled when the transfer was recorded.

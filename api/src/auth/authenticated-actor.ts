@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext, UnauthorizedException } from '@nestjs/common';
-import type { AccountDto, Role } from './auth-session.dto';
+import type { AccountDto, Role } from './dto/auth-session.dto';
 
 export interface AuthenticatedActor {
   readonly userId: string;

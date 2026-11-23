@@ -1,4 +1,4 @@
-import { MAX_CAMPAIGN_ITEMS as MAX_POSTGRES_INT } from '../campaign/campaign-pricing';
+import { MAX_POSTGRES_INT } from '../common/postgres-limits';
 import { MAX_MONEY_MINOR_UNITS } from '../common/money';
 
 type Progress = {

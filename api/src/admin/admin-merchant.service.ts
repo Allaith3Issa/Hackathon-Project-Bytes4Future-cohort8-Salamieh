@@ -1,9 +1,10 @@
+import { pageInfo } from '../common/pagination';
 import { ConflictException, HttpException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { accountRoles } from '../auth/account-roles';
 import { toMoneyJsonInteger } from '../common/money';
 import { Prisma, type MerchantVerificationStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { AdminMerchantDto, AdminMerchantPageDto, AdminMerchantQueryDto, VerifyMerchantDto } from './admin-merchant.dto';
+import type { AdminMerchantDto, AdminMerchantPageDto, AdminMerchantQueryDto, VerifyMerchantDto } from './dto/admin-merchant.dto';
 
 const merchantAccount = {
   id: true, name: true, phone: true, isAdmin: true, isCustomer: true, isMarketer: true, createdAt: true,
@@ -33,8 +34,7 @@ export class AdminMerchantService {
           where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize,
           take: pageSize, select: merchantAccount,
         });
-        return { items: await this.mapMerchants(tx, records), page, pageSize, total,
-          previousPage: page > 1 ? page - 1 : null, nextPage: page < lastPage ? page + 1 : null };
+        return { items: await this.mapMerchants(tx, records), ...pageInfo({ page, pageSize }, total) };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
     } catch (error) {
       return adminMerchantFailure(error);

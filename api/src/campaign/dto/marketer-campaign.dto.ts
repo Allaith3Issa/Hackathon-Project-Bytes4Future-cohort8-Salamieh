@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
-import { MAX_MONEY_MINOR_UNITS } from '../common/money';
+import { MAX_MONEY_MINOR_UNITS } from '../../common/money';
 import { CampaignDto, CampaignPageDto, CampaignPageQueryDto } from './campaign.dto';
 
 const campaignTypes = ['product', 'store_discount'] as const;

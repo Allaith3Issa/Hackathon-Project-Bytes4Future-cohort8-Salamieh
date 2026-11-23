@@ -2,12 +2,12 @@ import { BadRequestException, Controller, Get, Header, HttpCode, HttpStatus, Par
 import { ApiBearerAuth, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentActor, type AuthenticatedActor } from '../auth/authenticated-actor';
-import { AuthErrorDto } from '../auth/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { OfferQrPassDto, PublicOfferDto } from './referral.dto';
 import { ReferralService } from './referral.service';
-import { ReferralThrottlerGuard } from './referral-throttler.guard';
+import { ActorThrottlerGuard } from '../common/http/actor-throttler.guard';
 
 function requireEmptyBody(request: { body?: unknown }) {
   const { body } = request;
@@ -35,7 +35,7 @@ export class ReferralController {
 
   @Post('public/referrals/:code/clicks')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(ReferralThrottlerGuard)
+  @UseGuards(ActorThrottlerGuard)
   @Throttle({ default: { limit: 120, ttl: 60000 } })
   @ApiOperation({ summary: 'Record one referral click', description: 'Send one empty POST per real navigation. Skip SSR and prefetch.' })
   @ApiNoContentResponse({ description: 'Click recorded' })
@@ -49,7 +49,7 @@ export class ReferralController {
 
   @Post('customer/referrals/:code/offer-qr')
   @Header('Cache-Control', 'no-store')
-  @UseGuards(JwtAuthGuard, RolesGuard, ReferralThrottlerGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, ActorThrottlerGuard)
   @Roles('customer')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @ApiBearerAuth()

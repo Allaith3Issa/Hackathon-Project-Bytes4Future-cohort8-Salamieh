@@ -1,14 +1,14 @@
 import { BadRequestException, Controller, Get, Header, Param, ParseUUIDPipe, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiCreatedResponse, ApiExtraModels, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentActor, type AuthenticatedActor } from '../auth/authenticated-actor';
-import { AuthErrorDto } from '../auth/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles, RolesGuard } from '../auth/roles.guard';
-import { CampaignDto, CampaignFixedCommissionDto, CampaignPercentageCommissionDto } from './campaign.dto';
+import { CampaignDto, CampaignFixedCommissionDto, CampaignPercentageCommissionDto } from './dto/campaign.dto';
 import {
   CampaignDiscoveryQueryDto, DiscoverableCampaignPageDto, MarketerMembershipDto, MarketerMembershipLookupDto,
   MarketerMembershipPageDto, MarketerMembershipQueryDto,
-} from './marketer-campaign.dto';
+} from './dto/marketer-campaign.dto';
 import { MarketerCampaignService } from './marketer-campaign.service';
 
 @ApiTags('Marketer campaigns')

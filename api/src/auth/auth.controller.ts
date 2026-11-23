@@ -1,13 +1,14 @@
 import { applyDecorators, Body, Controller, Get, Header, Headers, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { requireRequestAuth, type RequestWithAuth } from './authenticated-actor';
-import { AccountDto, AuthErrorDto, AuthSessionDto } from './auth-session.dto';
+import { AccountDto, AuthSessionDto } from './dto/auth-session.dto';
+import { AuthErrorDto } from '../common/http/auth-error.dto';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { LoginDto } from './login.dto';
+import { LoginDto } from './dto/login.dto';
 import { LoginThrottlerGuard } from './login-throttler.guard';
-import { RegisterDto } from './register.dto';
-import { LogoutDto, RefreshDto } from './session-token.dto';
+import { RegisterDto } from './dto/register.dto';
+import { LogoutDto, RefreshDto } from './dto/session-token.dto';
 
 const ThrottleAuth = () => applyDecorators(
   UseGuards(LoginThrottlerGuard),

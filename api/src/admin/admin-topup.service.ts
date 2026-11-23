@@ -1,9 +1,10 @@
+import { pageInfo } from '../common/pagination';
 import { ConflictException, ForbiddenException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { IdempotencyService } from '../common/idempotency/idempotency.service';
 import { MAX_MONEY_MINOR_UNITS, toMoneyJsonInteger } from '../common/money';
 import { Prisma, type MerchantTopup, type MerchantVerificationStatus } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import type { AdminTopupPageDto, AdminTopupQueryDto, AdminTopupResultDto, CreateAdminTopupDto } from './admin-topup.dto';
+import type { AdminTopupPageDto, AdminTopupQueryDto, AdminTopupResultDto, CreateAdminTopupDto } from './dto/admin-topup.dto';
 
 function topupFields(topup: MerchantTopup, shopName: string): Omit<AdminTopupResultDto, 'merchantNewAvailableBalanceSyp'> {
   return { topupId: topup.id, merchantId: topup.merchantId, shopName, amountSyp: toMoneyJsonInteger(topup.amountSyp),
@@ -68,7 +69,7 @@ export class AdminTopupService {
         items: topups.map((topup) => ({ ...topupFields(topup, topup.merchant.shopName),
           merchantNewAvailableBalanceSyp: topup.merchantNewAvailableBalanceSyp === null
             ? null : toMoneyJsonInteger(topup.merchantNewAvailableBalanceSyp) })),
-        page, pageSize, total, previousPage: page > 1 ? page - 1 : null, nextPage: page < lastPage ? page + 1 : null,
+        ...pageInfo({ page, pageSize }, total),
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }

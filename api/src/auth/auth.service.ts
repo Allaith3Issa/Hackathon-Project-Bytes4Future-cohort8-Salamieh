@@ -8,9 +8,9 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestWithAuth } from './authenticated-actor';
 import { accountRoles } from './account-roles';
-import { ACCESS_TOKEN_SECONDS, AccountDto, AuthSessionDto } from './auth-session.dto';
-import { LoginDto } from './login.dto';
-import { RegisterDto } from './register.dto';
+import { ACCESS_TOKEN_SECONDS, AccountDto, AuthSessionDto } from './dto/auth-session.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 
 const SESSION_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000;
 const BCRYPT_HASH = /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/;
