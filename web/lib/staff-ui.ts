@@ -28,20 +28,29 @@ export function staffError(error: unknown) {
 }
 
 
-const whole = new Intl.NumberFormat("ar-SY");
-const pad2 = new Intl.NumberFormat("ar-SY", { minimumIntegerDigits: 2 });
-const decimal = new Intl.NumberFormat("ar-SY").formatToParts(1.5).find((p) => p.type === "decimal")?.value ?? "٫";
+export { formatSyp as formatMoney } from "./ui";
 
-export function formatMoney(minor: number) {
-  return `${whole.format(Math.trunc(minor / 100))}${decimal}${pad2.format(minor % 100)} ل.س.`;
-}
+const arabicDigits = (v: string) => v.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632));
+const dotted = (v: string) => arabicDigits(v.trim()).replace(/[٫,،]/g, ".");
 
 
 export function parseMoney(input: string): number | null {
-  const v = input.trim().replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632)).replace(/[٫,]/g, ".");
-  const m = /^([0-9]{1,14})(?:\.([0-9]{1,2}))?$/.exec(v);
+  const m = /^([0-9]{1,14})(?:\.([0-9]{1,2}))?$/.exec(dotted(input));
   if (!m) return null;
   const minor = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
   return Number.isSafeInteger(minor) ? minor : null;
 }
 
+
+export function parsePositiveMoney(input: string): number | null {
+  const minor = parseMoney(input);
+  return minor !== null && minor > 0 ? minor : null;
+}
+
+
+export function parsePercent(input: string): number | null {
+  const v = dotted(input);
+  if (!/^(100|[0-9]{1,2})(\.[0-9]{1,2})?$/.test(v)) return null;
+  const n = Number(v);
+  return n <= 100 ? n : null;
+}

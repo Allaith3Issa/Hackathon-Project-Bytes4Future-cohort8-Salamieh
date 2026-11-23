@@ -8,8 +8,12 @@ export function formatNumber(value: number) {
   return number.format(value);
 }
 
-export function formatSyp(value: number) {
-  return `${number.format(value)} ل.س.`;
+const pad2 = new Intl.NumberFormat("ar-SY", { minimumIntegerDigits: 2 });
+const decimalSign = number.formatToParts(1.5).find((p) => p.type === "decimal")?.value ?? "٫";
+
+
+export function formatSyp(minor: number) {
+  return `${number.format(Math.trunc(minor / 100))}${decimalSign}${pad2.format(minor % 100)} ل.س.`;
 }
 
 export function formatDate(value: string) {
