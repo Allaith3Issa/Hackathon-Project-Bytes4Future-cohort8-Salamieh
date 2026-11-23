@@ -10,7 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function AdminPage() {
   const { t } = await getI18n();
   const account = await getAccount();
-  if (account?.roles.includes("admin")) return redirectLocalized("/admin/topups");
+  if (account?.roles.includes("admin")) return redirectLocalized("/admin/revenue");
   return (
     <div className="page-wrap py-10 sm:py-16">
       <section className="surface mx-auto max-w-md p-5 sm:p-8">

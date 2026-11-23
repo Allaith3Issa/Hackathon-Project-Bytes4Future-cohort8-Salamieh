@@ -69,18 +69,31 @@ test('Step 11C reporting against isolated PostgreSQL', { skip: !databaseUrl, tim
   const buyer = await register(3, ['customer']);
   const otherSeller = await register(4, ['merchant']);
   const otherMarketer = await register(5, ['marketer']);
+  const marketerWithoutSales = await register(7, ['marketer']);
   const admin = await db.user.create({ data: { phone: '0999210006', name: 'Fixture admin',
     isAdmin: true, passwordHash: await bcrypt.hash(password, 10) } });
   const adminSession = await json(await post('auth/admin/login', { body: { phone: admin.phone, password } }), 200);
   const revenue = () => read('admin/revenue', adminSession.accessToken);
+  const revenueSummary = () => read('admin/revenue/summary', adminSession.accessToken);
+  const marketerEarnings = (query = '') => read(`admin/revenue/marketers${query}`, adminSession.accessToken);
 
   await t.test('platform revenue is zero without sales and requires an admin session', async () => {
     assert.deepEqual(await revenue(), { netPlatformFeesSyp: 0 });
+    assert.deepEqual(await revenueSummary(), { netPlatformFeesSyp: 0, totalMarketerCommissionSyp: 0 });
     assert.equal((await json(await request('admin/revenue'), 401)).code, 'AUTH_REQUIRED');
+    assert.equal((await json(await request('admin/revenue/summary'), 401)).code, 'AUTH_REQUIRED');
+    assert.equal((await json(await request('admin/revenue/marketers'), 401)).code, 'AUTH_REQUIRED');
     assert.equal((await json(await request('admin/revenue', { token: 'invalid-token' }), 401)).code, 'AUTH_REQUIRED');
     for (const actor of [buyer, seller, otherMarketer, multi]) {
       assert.equal((await json(await request('admin/revenue', { token: actor.token }), 403)).code, 'FORBIDDEN');
+      assert.equal((await json(await request('admin/revenue/summary', { token: actor.token }), 403)).code, 'FORBIDDEN');
+      assert.equal((await json(await request('admin/revenue/marketers', { token: actor.token }), 403)).code, 'FORBIDDEN');
     }
+    assert.equal((await json(await request('admin/revenue/marketers?pageSize=101', { token: adminSession.accessToken }), 400)).code,
+      'VALIDATION_ERROR');
+    const directory = await marketerEarnings();
+    assert.equal(directory.total, 3);
+    assert.ok(directory.items.every(({ salesCount, totalEarnedSyp }) => salesCount === 0 && totalEarnedSyp === 0));
   });
 
   await t.test('empty histories and independent reads for a pending multi-role merchant', async () => {
@@ -185,6 +198,16 @@ test('Step 11C reporting against isolated PostgreSQL', { skip: !databaseUrl, tim
 
   await t.test('platform revenue adds settled sales from both merchants without writing data', async () => {
     assert.deepEqual(await revenue(), { netPlatformFeesSyp: 10800 });
+    assert.deepEqual(await revenueSummary(), { netPlatformFeesSyp: 10800, totalMarketerCommissionSyp: 40000 });
+    const first = await marketerEarnings('?pageSize=2');
+    const second = await marketerEarnings('?pageSize=2&page=2');
+    assert.deepEqual([first.total, first.nextPage, second.previousPage, second.nextPage], [3, 2, 1, null]);
+    assert.deepEqual([...first.items, ...second.items], [
+      { id: marketerWithoutSales.id, name: 'Fixture 7', phone: '0999210007', salesCount: 0, totalEarnedSyp: 0 },
+      { id: otherMarketer.id, name: 'Fixture 5', phone: '0999210005', salesCount: 1, totalEarnedSyp: 10000 },
+      { id: multi.id, name: 'Fixture 1', phone: '0999210001', salesCount: 3, totalEarnedSyp: 30000 },
+    ]);
+    assert.deepEqual((await marketerEarnings('?pageSize=2&page=3')).items, []);
     assert.deepEqual(await snapshot(), before);
   });
 

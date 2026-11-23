@@ -1,6 +1,8 @@
 import { getI18n } from "@/lib/i18n-server";
 import type { Metadata } from "next";
 import { InformationPage } from "@/components/information-page";
+import { RecoveringSession } from "@/components/recovering-session";
+import { requirePageAccount } from "@/lib/session";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -8,6 +10,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AboutPage() {
+  if (!(await requirePageAccount())) return <RecoveringSession />;
   const { t } = await getI18n();
   return (
     <InformationPage title={t("about.aboutUs")} introduction={t("about.mardoodIsAPilotProjectBuilt")}>

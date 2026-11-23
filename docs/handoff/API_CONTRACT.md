@@ -461,12 +461,18 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/campaigns` | Admin | Pagination, optional `status` | `200 Page<AdminCampaign>` |
 | `GET /admin/overview` | Admin | None | `200 AdminOverview` |
 | `GET /admin/revenue` | Admin | None | `200 AdminRevenue` |
+| `GET /admin/revenue/summary` | Admin | None | `200 AdminRevenueSummary` |
+| `GET /admin/revenue/marketers` | Admin | Pagination | `200 Page<AdminMarketerEarnings>` |
 
 For the MVP, merchant verification changes `pending` to `verified` or `rejected`. Repeating the same decision returns `200`. Supplying `contractReference` sets it, and omitting it preserves the current value. Reversing a decided status returns `409 INVALID_STATUS_TRANSITION`. When conflicting decisions arrive concurrently, the first committed decision wins.
 
 Top-ups record confirmed offline payments to verified merchants. The amount must be a positive safe integer in new SYP minor units, and `referenceNote` must be nonblank and at most 256 characters. The post-credit balance is captured when the wallet is credited. POST always returns a number. History returns that stored balance and uses `null` only for legacy records whose post-credit balance cannot be verified. History is ordered by creation time descending, then top-up ID descending.
 
 Revenue is the all-time sum of the persisted net platform fees on committed sales, in new SYP minor units. Unredeemed or expired offers, failed or rolled-back settlements, top-ups, and reserve movements contribute nothing. Replaying a settlement does not add revenue. The endpoint returns `Cache-Control: no-store`, returns `0` when no sales exist, and returns `409 AMOUNT_OUT_OF_RANGE` if the total exceeds the monetary limit.
+
+The revenue summary returns net platform fees and the total commissions earned by all marketers from the same set of settled sales. Both amounts use the same no-store, zero, and range rules as platform revenue.
+
+The marketer earnings list returns one row per marketer account, including multi-role accounts and marketers with no settled sales. Rows contain `id`, `name`, `phone`, `salesCount` (settled sales attributed to that marketer), and `totalEarnedSyp` (commission from those sales in new SYP minor units). Rows are ordered by account creation time descending, then ID descending. Marketers without settled sales have zero sales and zero commission. This admin-only report uses the same no-store and monetary range rules.
 
 ### Payout accounting (future)
 
@@ -503,6 +509,10 @@ type AdminCampaign = MerchantCampaign & { merchantId: string; shopName: string }
 
 type AdminRevenue = {
   netPlatformFeesSyp: number;
+};
+
+type AdminRevenueSummary = AdminRevenue & {
+  totalMarketerCommissionSyp: number;
 };
 
 type AdminOverview = {

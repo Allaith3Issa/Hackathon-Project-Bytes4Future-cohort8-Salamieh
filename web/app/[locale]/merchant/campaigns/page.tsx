@@ -3,7 +3,8 @@ import { localizedPath } from "@/lib/locale";
 import type { Metadata } from "next";
 import Link from "@/components/localized-link";
 import { authenticatedRequest } from "@/lib/session";
-import { expiredRedirect, requireRole } from "@/lib/staff";
+import { RecoveringSession } from "@/components/recovering-session";
+import { expiredRedirect, requirePageRole } from "@/lib/staff";
 import type { MerchantCampaign, Page } from "@/lib/staff-contract";
 import { staffError, statusLabels } from "@/lib/staff-ui";
 
@@ -13,14 +14,14 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CampaignsPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const { t, locale, formatDate, formatSyp: formatMoney } = await getI18n();
-  await requireRole("merchant");
+  if (!(await requirePageRole("merchant"))) return <RecoveringSession />;
   const { page } = await searchParams;
   const n = typeof page === "string" && /^[1-9][0-9]{0,7}$/.test(page) ? page : "1";
   let data: Page<MerchantCampaign>;
   try {
     data = await authenticatedRequest<Page<MerchantCampaign>>(`/merchant/campaigns?page=${n}`);
   } catch (error) {
-    await expiredRedirect(error, "merchant");
+    await expiredRedirect(error);
     return (
       <div className="page-wrap space-y-4 py-7 sm:py-12">
         <h1 className="page-title">{t("campaigns.myCampaigns")}</h1>
