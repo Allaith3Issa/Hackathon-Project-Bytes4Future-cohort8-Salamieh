@@ -8,6 +8,7 @@ import { Field } from "./field";
 import { useAttemptKey } from "./use-attempt-key";
 import { useFocusError } from "./use-focus-error";
 
+
 const empty = {
   productName: "", description: "", imageUrl: "", originalPriceSyp: "", discountPercent: "",
   commissionSyp: "", maxItems: "", endsAt: "",
