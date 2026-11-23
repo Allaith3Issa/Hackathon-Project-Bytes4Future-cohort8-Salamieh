@@ -6,21 +6,17 @@ import { ApiError, apiRequest } from "@/lib/api";
 import type { AuthSession } from "@/lib/contract";
 import { authenticatedRequest, saveSession } from "@/lib/session";
 import type {
-  AdminTopupResult, CampaignPreview, MerchantCampaign, OfferRedeemResult, ScannerLookup,
+  VoucherRedeemResult, AdminTopupResult, CampaignPreview, MerchantCampaign, OfferRedeemResult, ScannerLookup,
 } from "@/lib/staff-contract";
-import { staffError } from "@/lib/staff-ui";
+import { parseMoney, staffError } from "@/lib/staff-ui";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY_ERROR = "تعذّر تجهيز الطلب. حدّث الصفحة وحاول مرة أخرى.";
 const methods = ["cash", "sham_cash", "syriatel_cash", "bank_transfer"];
 const text = (d: FormData, k: string) => String(d.get(k) ?? "").trim();
 const digits = (v: string) => v.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632));
-const syp = (v: string) => {
-  const n = digits(v);
-  return /^[0-9]{1,16}$/.test(n) && Number.isSafeInteger(Number(n)) ? Number(n) : null;
-};
 
-/* ---------- sign-in ---------- */
+
 export interface StaffSignInState { error?: string; phoneError?: string; passwordError?: string }
 
 export async function staffSignIn(
@@ -45,7 +41,7 @@ export async function staffSignIn(
   redirect(kind === "admin" ? "/admin/topups" : "/merchant/campaigns/new");
 }
 
-/* ---------- admin top-up ---------- */
+
 export interface TopupState {
   result?: AdminTopupResult; error?: string;
   errors?: Partial<Record<"merchantId" | "amount" | "note", string>>;
@@ -54,7 +50,7 @@ export interface TopupState {
 export async function topUp(_state: TopupState, data: FormData): Promise<TopupState> {
   const key = text(data, "key");
   const merchantId = text(data, "merchantId");
-  const amount = syp(text(data, "amount"));
+  const amount = parseMoney(text(data, "amount"));
   const method = text(data, "paymentMethod");
   const note = text(data, "note");
   if (!uuid.test(key)) return { error: KEY_ERROR };
@@ -76,7 +72,7 @@ export async function topUp(_state: TopupState, data: FormData): Promise<TopupSt
   }
 }
 
-/* ---------- merchant campaigns ---------- */
+
 export interface CampaignState {
   preview?: { key: string; values: CampaignPreview };
   error?: string;
@@ -88,9 +84,9 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
   const key = text(data, "key");
   if (!uuid.test(key)) return { error: KEY_ERROR };
   const preview = state.preview?.key === key ? state.preview : undefined;
-  const price = syp(text(data, "originalPriceSyp"));
-  const commission = syp(text(data, "commissionSyp"));
-  const maxItems = syp(text(data, "maxItems"));
+  const price = parseMoney(text(data, "originalPriceSyp"));
+  const commission = parseMoney(text(data, "commissionSyp"));
+  const maxItems = /^[0-9]{1,10}$/.test(digits(text(data, "maxItems"))) ? Number(digits(text(data, "maxItems"))) : null;
   const discountText = digits(text(data, "discountPercent"));
   const discount = /^(100|[0-9]{1,2})(\.[0-9]{1,2})?$/.test(discountText) ? Number(discountText) : null;
   const errors: Record<string, string> = {};
@@ -102,7 +98,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
   const description = text(data, "description");
   const imageUrl = text(data, "imageUrl");
   const endsRaw = text(data, "endsAt");
-  const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; // Damascus is UTC+3
+  const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; 
   if (launch) {
     if (!productName) errors.productName = "أدخل اسم المنتج.";
     if (!description) errors.description = "أدخل وصفاً للمنتج.";
@@ -126,7 +122,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
     redirect(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
   } catch (error) {
     if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error) };
-    throw error; // let Next.js redirect propagate
+    throw error;
   }
 }
 
@@ -143,7 +139,7 @@ export async function closeCampaign(id: string, _state: CloseState): Promise<Clo
   }
 }
 
-/* ---------- scanner ---------- */
+
 export async function lookupOffer(code: string): Promise<{ lookup?: ScannerLookup; error?: string }> {
   const value = code.trim();
   if (!value || value.length > 200) return { error: "أدخل الرمز الظاهر على بطاقة الزبون." };
@@ -161,5 +157,21 @@ export async function redeemOffer(code: string, key: string): Promise<{ result?:
   } catch (error) {
     const uncertain = error instanceof ApiError && (error.status >= 500 || error.code === "RATE_LIMITED");
     return { error: staffError(error), terminal: !uncertain };
+  }
+}
+
+export async function redeemVoucher(
+  code: string, billTotal: string, key: string,
+): Promise<{ result?: VoucherRedeemResult; error?: string; terminal?: boolean }> {
+  const bill = parseMoney(billTotal);
+  if (!bill) return { error: "أدخل إجمالي الفاتورة بأرقام صحيحة، حتى منزلتين عشريتين." };
+  if (!uuid.test(key)) return { error: KEY_ERROR, terminal: true };
+  try {
+    return { result: await authenticatedRequest<VoucherRedeemResult>("/merchant/scanner/redeem-voucher", { method: "POST", idempotencyKey: key, body: { code: code.trim(), billTotalSyp: bill } }) };
+  } catch (error) {
+    const uncertain = error instanceof ApiError && (error.status >= 500 || error.code === "RATE_LIMITED");
+
+    const keepOpen = error instanceof ApiError && error.code === "VOUCHER_EXCEEDS_BILL";
+    return { error: staffError(error), terminal: !uncertain && !keepOpen };
   }
 }

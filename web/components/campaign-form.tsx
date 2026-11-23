@@ -2,8 +2,7 @@
 
 import { useActionState, useId, useRef, useState } from "react";
 import { campaignAction } from "@/app/staff-actions";
-import { formatSyp } from "@/lib/ui";
-import { fieldClass } from "@/lib/staff-ui";
+import { fieldClass, formatMoney } from "@/lib/staff-ui";
 import { Field } from "./field";
 import { useAttemptKey } from "./use-attempt-key";
 import { useFocusError } from "./use-focus-error";
@@ -31,7 +30,7 @@ export function CampaignForm() {
   const text = (name: keyof Values, label: string, extra: { numeric?: boolean; type?: string; hint?: string } = {}) => (
     <Field id={`${id}-${name}`} label={label} error={e[name]} hint={extra.hint}>
       <input id={`${id}-${name}`} name={name} value={v[name]} type={extra.type} className={fieldClass}
-        dir={extra.numeric || extra.type || name === "imageUrl" ? "ltr" : undefined} inputMode={extra.numeric ? "numeric" : undefined}
+        dir={extra.numeric || extra.type || name === "imageUrl" ? "ltr" : undefined} inputMode={extra.numeric ? "decimal" : undefined}
         aria-invalid={Boolean(e[name])} aria-describedby={e[name] ? `${id}-${name}-error` : extra.hint ? `${id}-${name}-hint` : undefined}
         onChange={(ev) => set(name, ev.target.value)} />
     </Field>
@@ -48,9 +47,9 @@ export function CampaignForm() {
         </Field>
         {text("imageUrl", "رابط صورة المنتج", { hint: "رابط يبدأ بـ https." })}
         <div className="grid gap-4 sm:grid-cols-2">
-          {text("originalPriceSyp", "السعر الأصلي (ل.س.)", { numeric: true })}
+          {text("originalPriceSyp", "السعر الأصلي (ل.س.)", { numeric: true, hint: "مثال: 150.00" })}
           {text("discountPercent", "نسبة الخصم %", { numeric: true })}
-          {text("commissionSyp", "عمولة المسوّق لكل قطعة (ل.س.)", { numeric: true, hint: "عمولة ثابتة." })}
+          {text("commissionSyp", "عمولة المسوّق لكل قطعة (ل.س.)", { numeric: true, hint: "عمولة ثابتة، مثال: 10.00" })}
           {text("maxItems", "أقصى عدد قطع", { numeric: true })}
         </div>
         {text("endsAt", "موعد انتهاء الحملة", { type: "datetime-local", hint: "بتوقيت دمشق." })}
@@ -61,10 +60,10 @@ export function CampaignForm() {
         {p ? (
           <>
             <dl className="grid gap-3">
-              <div><dt className="text-sm text-muted">سعر البيع للزبون</dt><dd className="font-semibold tabular-nums">{p.finalPriceSyp === null ? "—" : formatSyp(p.finalPriceSyp)}</dd></div>
-              <div><dt className="text-sm text-muted">عمولة المسوّق لكل قطعة</dt><dd className="font-semibold tabular-nums">{formatSyp(p.commissionPerUnitSyp)}</dd></div>
-              <div className="rounded-lg bg-ink p-4 text-white"><dt className="text-sm font-semibold">الاحتياطي المحجوز عند الإطلاق</dt><dd className="mt-1 text-2xl font-bold tabular-nums">{formatSyp(p.worstCaseReserveSyp)}</dd></div>
-              <div><dt className="text-sm text-muted">رصيدك المتاح</dt><dd className="font-semibold tabular-nums">{formatSyp(p.merchantAvailableBalanceSyp)}</dd></div>
+              <div><dt className="text-sm text-muted">سعر البيع للزبون</dt><dd className="font-semibold tabular-nums">{p.finalPriceSyp === null ? "—" : formatMoney(p.finalPriceSyp)}</dd></div>
+              <div><dt className="text-sm text-muted">عمولة المسوّق لكل قطعة</dt><dd className="font-semibold tabular-nums">{formatMoney(p.commissionPerUnitSyp)}</dd></div>
+              <div className="rounded-lg bg-ink p-4 text-white"><dt className="text-sm font-semibold">الاحتياطي المحجوز عند الإطلاق</dt><dd className="mt-1 text-2xl font-bold tabular-nums">{formatMoney(p.worstCaseReserveSyp)}</dd></div>
+              <div><dt className="text-sm text-muted">رصيدك المتاح</dt><dd className="font-semibold tabular-nums">{formatMoney(p.merchantAvailableBalanceSyp)}</dd></div>
             </dl>
             {!p.isAffordableByMerchant && <p role="alert" className="notice-error">رصيدك المتاح أقل من الاحتياطي المطلوب. اطلب شحن الرصيد من الإدارة أو خفّض العدد.</p>}
           </>

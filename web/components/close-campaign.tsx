@@ -2,8 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { closeCampaign } from "@/app/staff-actions";
-import { formatSyp } from "@/lib/ui";
-import { statusLabels } from "@/lib/staff-ui";
+import { statusLabels, formatMoney } from "@/lib/staff-ui";
 
 export function CloseCampaign({ id }: { id: string }) {
   const [state, submit, pending] = useActionState(closeCampaign.bind(null, id), {});
@@ -13,7 +12,7 @@ export function CloseCampaign({ id }: { id: string }) {
     return (
       <div role="status" className="rounded-lg bg-success-bg p-4 text-success">
         <p className="font-bold">حالة الحملة: {statusLabels[c.status]}</p>
-        <p className="mt-1">الاحتياطي المتبقي المحجوز: <span className="font-semibold tabular-nums">{formatSyp(c.usage.lockedBudgetSyp)}</span></p>
+        <p className="mt-1">الاحتياطي المتبقي المحجوز: <span className="font-semibold tabular-nums">{formatMoney(c.usage.lockedBudgetSyp)}</span></p>
       </div>
     );
   }

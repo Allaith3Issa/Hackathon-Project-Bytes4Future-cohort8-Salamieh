@@ -40,3 +40,8 @@ export interface OfferRedeemResult {
   customerCashbackSyp: number; platformNetFeeSyp: number; remainingLockedBudgetSyp: number;
   campaignStatusAfterSale: "active" | "ended"; scannedAt: string;
 }
+
+export interface VoucherRedeemResult {
+  voucherId: string; amountSyp: number; billTotalSyp: number; customerPaidCashSyp: number;
+  merchantNewAvailableBalanceSyp: number; redeemedAt: string;
+}

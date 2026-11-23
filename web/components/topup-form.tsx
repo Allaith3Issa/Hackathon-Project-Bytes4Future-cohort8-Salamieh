@@ -2,8 +2,7 @@
 
 import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { topUp } from "@/app/staff-actions";
-import { formatSyp } from "@/lib/ui";
-import { fieldClass, paymentLabels } from "@/lib/staff-ui";
+import { fieldClass, paymentLabels, formatMoney, parseMoney } from "@/lib/staff-ui";
 import type { AdminMerchant, PaymentMethod } from "@/lib/staff-contract";
 import { Field } from "./field";
 import { useAttemptKey } from "./use-attempt-key";
@@ -31,7 +30,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
   const set = (name: keyof typeof empty, value: string) => {
     setV((old) => ({ ...old, [name]: value }));
     setLocal({});
-    renewKey(); // body changed, so this is a new attempt
+    renewKey(); 
   };
   useEffect(() => { if (state.errors) setReview(false); }, [state]);
 
@@ -43,11 +42,11 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
         <dl className="mt-4 grid overflow-hidden rounded-xl border border-rule sm:grid-cols-2">
           <div className="bg-ink p-5 text-white">
             <dt className="text-sm font-semibold">رصيد {r.shopName} المتاح الآن</dt>
-            <dd className="mt-2 text-3xl font-bold tabular-nums">{formatSyp(r.merchantNewAvailableBalanceSyp)}</dd>
+            <dd className="mt-2 text-3xl font-bold tabular-nums">{formatMoney(r.merchantNewAvailableBalanceSyp)}</dd>
           </div>
           <div className="bg-mauve p-5">
             <dt className="text-sm font-semibold">المبلغ المشحون</dt>
-            <dd className="mt-2 text-2xl font-bold tabular-nums">{formatSyp(r.amountSyp)}</dd>
+            <dd className="mt-2 text-2xl font-bold tabular-nums">{formatMoney(r.amountSyp)}</dd>
             <dd className="mt-1 text-sm text-muted">{paymentLabels[r.paymentMethod]} · <bdi dir="ltr">{r.referenceNote}</bdi></dd>
           </div>
         </dl>
@@ -59,7 +58,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
   const goReview = () => {
     const found: Record<string, string> = {};
     if (!v.merchantId) found.merchantId = "اختر التاجر.";
-    if (!/^[0-9٠-٩]+$/.test(v.amount) || /^[0٠]+$/.test(v.amount)) found.amount = "أدخل مبلغاً صحيحاً أكبر من صفر.";
+    if (!parseMoney(v.amount) ) found.amount = "أدخل مبلغاً صحيحاً أكبر من صفر (حتى منزلتين عشريتين).";
     if (!v.note.trim()) found.note = "أدخل مرجع الدفع.";
     setLocal(found);
     if (!Object.keys(found).length) setReview(true);
@@ -74,7 +73,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
           <h2 className="text-xl font-bold">راجع الشحن قبل التأكيد</h2>
           <dl className="grid gap-3 rounded-lg bg-mauve p-4">
             <div><dt className="text-sm text-muted">التاجر</dt><dd className="font-semibold">{merchant?.merchant.name}</dd></div>
-            <div><dt className="text-sm text-muted">المبلغ</dt><dd className="text-2xl font-bold tabular-nums">{formatSyp(Number(v.amount.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632))))}</dd></div>
+            <div><dt className="text-sm text-muted">المبلغ</dt><dd className="text-2xl font-bold tabular-nums">{formatMoney(parseMoney(v.amount) ?? 0)}</dd></div>
             <div><dt className="text-sm text-muted">طريقة الدفع والمرجع</dt><dd>{paymentLabels[v.paymentMethod as PaymentMethod]} · <bdi dir="ltr">{v.note}</bdi></dd></div>
           </dl>
           {state.error && <p role="alert" className="notice-error">{state.error}</p>}
@@ -92,9 +91,9 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
               {merchants.map((m) => <option key={m.id} value={m.id}>{m.merchant.name}</option>)}
             </select>
           </Field>
-          {merchant && <p className="notice">الرصيد المتاح حالياً: {formatSyp(merchant.wallet.availableBalanceSyp)}</p>}
-          <Field id={`${id}-a`} label="المبلغ (ل.س.)" error={errors.amount}>
-            <input id={`${id}-a`} className={fieldClass} dir="ltr" inputMode="numeric" value={v.amount} aria-invalid={Boolean(errors.amount)} aria-describedby={errors.amount ? `${id}-a-error` : undefined} onChange={(e) => set("amount", e.target.value)} />
+          {merchant && <p className="notice">الرصيد المتاح حالياً: {formatMoney(merchant.wallet.availableBalanceSyp)}</p>}
+          <Field id={`${id}-a`} label="المبلغ (ل.س.)" hint="مثال: 500.00" error={errors.amount}>
+            <input id={`${id}-a`} className={fieldClass} dir="ltr" inputMode="decimal" value={v.amount} aria-invalid={Boolean(errors.amount)} aria-describedby={errors.amount ? `${id}-a-error` : undefined} onChange={(e) => set("amount", e.target.value)} />
           </Field>
           <Field id={`${id}-p`} label="طريقة الدفع">
             <select id={`${id}-p`} className={fieldClass} value={v.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>

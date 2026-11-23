@@ -3,8 +3,8 @@ import Link from "next/link";
 import { authenticatedRequest } from "@/lib/session";
 import { expiredRedirect, requireRole } from "@/lib/staff";
 import type { MerchantCampaign, Page } from "@/lib/staff-contract";
-import { staffError, statusLabels } from "@/lib/staff-ui";
-import { formatDate, formatSyp } from "@/lib/ui";
+import { staffError, statusLabels, formatMoney } from "@/lib/staff-ui";
+import { formatDate } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "حملاتي" };
 
@@ -36,7 +36,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
             <li key={c.id}>
               <Link href={`/merchant/campaigns/${encodeURIComponent(c.id)}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 hover:bg-mauve">
                 <span><span className="block font-semibold">{c.productName}</span><span className="text-sm text-muted">ينتهي {formatDate(c.endsAt)}</span></span>
-                <span className="text-sm tabular-nums">{c.finalPriceSyp === null ? "" : `${formatSyp(c.finalPriceSyp)} · `}{statusLabels[c.status]}</span>
+                <span className="text-sm tabular-nums">{c.finalPriceSyp === null ? "" : `${formatMoney(c.finalPriceSyp)} · `}{statusLabels[c.status]}</span>
               </Link>
             </li>
           ))}
