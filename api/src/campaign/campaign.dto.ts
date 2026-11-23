@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional, getSchemaPath } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsISO8601, IsOptional, IsString, IsUrl, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsISO8601, IsOptional, IsString, IsUrl, Matches, MaxLength } from 'class-validator';
 import { MAX_MONEY_MINOR_UNITS } from '../common/money';
+import { PageDto, PageQueryDto } from '../common/pagination.dto';
 import { CampaignPreviewInputDto } from './campaign-preview.dto';
+
+export { PageDto as CampaignPageDto, PageQueryDto as CampaignPageQueryDto };
 
 const statuses = ['active', 'ended'] as const;
 const money = {
@@ -40,26 +42,7 @@ export class LaunchCampaignDto extends CampaignPreviewInputDto {
   joinMode!: 'open';
 }
 
-const parseQueryInteger = ({ value }: { value: unknown }) =>
-  typeof value === 'string' && /^[0-9]+$/.test(value) ? Number(value) : value;
-
-export class CampaignPageQueryDto {
-  @ApiPropertyOptional({ type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER, default: 1 })
-  @Transform(parseQueryInteger)
-  @IsInt()
-  @Min(1)
-  @Max(Number.MAX_SAFE_INTEGER)
-  page = 1;
-
-  @ApiPropertyOptional({ type: 'integer', minimum: 1, maximum: 100, default: 20 })
-  @Transform(parseQueryInteger)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  pageSize = 20;
-}
-
-export class MerchantCampaignQueryDto extends CampaignPageQueryDto {
+export class MerchantCampaignQueryDto extends PageQueryDto {
   @ApiPropertyOptional({ enum: statuses })
   @IsOptional()
   @IsIn(statuses)
@@ -162,20 +145,7 @@ export class MerchantCampaignDto extends CampaignDto {
   stats!: MerchantCampaignStatsDto;
 }
 
-export class CampaignPageDto {
-  @ApiProperty({ ...count, minimum: 1 })
-  page!: number;
-  @ApiProperty({ ...count, minimum: 1, maximum: 100 })
-  pageSize!: number;
-  @ApiProperty(count)
-  total!: number;
-  @ApiProperty({ ...count, minimum: 1, nullable: true })
-  previousPage!: number | null;
-  @ApiProperty({ ...count, minimum: 1, nullable: true })
-  nextPage!: number | null;
-}
-
-export class MerchantCampaignPageDto extends CampaignPageDto {
+export class MerchantCampaignPageDto extends PageDto {
   @ApiProperty({ type: [MerchantCampaignDto] })
   items!: MerchantCampaignDto[];
 }

@@ -166,7 +166,12 @@ async function seed() {
       for (const [key, amountSyp] of [[2, 100_000n], [5, reserve]] as const) {
         const topupId = fixtureId(20 + key);
         await tx.merchantTopup.create({
-          data: { id: topupId, merchantId: fixtureId(key), adminId, amountSyp, paymentMethod: 'cash', referenceNote: 'Simulated demo opening credit' },
+          data: {
+            id: topupId, merchantId: fixtureId(key), adminId, amountSyp, paymentMethod: 'cash',
+            referenceNote: 'Simulated demo opening credit',
+            // The scanner fixture locks the opening credit in its campaign after the top-up.
+            merchantNewAvailableBalanceSyp: amountSyp,
+          },
         });
         await tx.moneyMovement.create({
           data: { id: fixtureId(30 + key), topupId, walletId: fixtureId(10 + key), amountSyp, kind: 'merchant_topup' },

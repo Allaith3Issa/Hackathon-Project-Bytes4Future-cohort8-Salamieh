@@ -186,6 +186,8 @@ model MerchantTopup {
   merchantId    String             @map("merchant_id") @db.Uuid
   adminId       String             @map("admin_id") @db.Uuid
   amountSyp     BigInt             @map("amount_syp")
+  // Null only for historical rows without a provable post-credit balance.
+  merchantNewAvailableBalanceSyp BigInt? @map("merchant_new_available_balance_syp")
   paymentMethod TopupPaymentMethod @map("payment_method")
   referenceNote String             @map("reference_note")
   createdAt     DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -195,6 +197,7 @@ model MerchantTopup {
   moneyMovements MoneyMovement[]
 
   @@index([merchantId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([createdAt(sort: Desc), id(sort: Desc)])
   @@map("merchant_topups")
 }
 

@@ -451,7 +451,7 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/merchants` | Admin | Pagination, optional `verificationStatus` | `200 Page<AdminMerchant>` |
 | `PATCH /admin/merchants/{merchantId}/verification` | Admin | `{ status: "verified" \| "rejected", contractReference?: string }` | `200 AdminMerchant` |
 | `POST /admin/merchants/{merchantId}/topups` | Admin | `{ amountSyp, paymentMethod, referenceNote }` + `Idempotency-Key` | `201 AdminTopupResult` |
-| `GET /admin/topups` | Admin | Pagination, optional `merchantId` | `200 Page<AdminTopupResult>` |
+| `GET /admin/topups` | Admin | Pagination, optional `merchantId` | `200 Page<AdminTopupHistoryEntry>` |
 | `GET /admin/payouts` | Admin | Pagination, optional `status` | `200 Page<PayoutRequest>` |
 | `POST /admin/payouts/{payoutId}/upload-receipt` | Admin | Multipart form image (`receipt`) | `200 { transferReceiptUrl: string }` |
 | `PATCH /admin/payouts/{payoutId}/mark-transferred` | Admin | `{ transferReference, transferReceiptUrl }` | `200 PayoutRequest` |
@@ -460,6 +460,10 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/users` | Admin | Pagination, optional `role` | `200 Page<AdminUser>` |
 | `GET /admin/campaigns` | Admin | Pagination, optional `status` | `200 Page<AdminCampaign>` |
 | `GET /admin/overview` | Admin | None | `200 AdminOverview` |
+
+For the MVP, merchant verification changes `pending` to `verified` or `rejected`. Repeating the same decision returns `200`. Supplying `contractReference` sets it, and omitting it preserves the current value. Reversing a decided status returns `409 INVALID_STATUS_TRANSITION`. When conflicting decisions arrive concurrently, the first committed decision wins.
+
+Top-ups record confirmed offline payments to verified merchants. The amount must be a positive safe integer in new SYP minor units, and `referenceNote` must be nonblank and at most 256 characters. The post-credit balance is captured when the wallet is credited. POST always returns a number. History returns that stored balance and uses `null` only for legacy records whose post-credit balance cannot be verified. History is ordered by creation time descending, then top-up ID descending.
 
 ### Payout accounting (future)
 
@@ -479,6 +483,10 @@ type AdminTopupResult = {
   referenceNote: string;
   merchantNewAvailableBalanceSyp: number;
   createdAt: string;
+};
+
+type AdminTopupHistoryEntry = Omit<AdminTopupResult, 'merchantNewAvailableBalanceSyp'> & {
+  merchantNewAvailableBalanceSyp: number | null;
 };
 
 type AdminUser = Pick<Account, 'id' | 'name' | 'phone' | 'roles' | 'createdAt'>;
@@ -539,6 +547,7 @@ All monetary operands and results below are integer minor units. Percentages, it
 - `lookup` and both redemption routes accept a QR token or the matching human-readable code. Offer lookup and redemption require a verified merchant who owns the campaign. An out-of-scope code returns `404 NOT_FOUND` without disclosing customer details. Lookup returns the cash amount for quantity 1 before confirmation. The redemption response returns the settlement breakdown.
 - Demo offer redemption accepts `{ code }` or `{ code, quantity: 1 }`. Other quantities and `originalBillSyp` return `400 VALIDATION_ERROR`. Demo campaign preview and launch accept product campaigns with fixed commission, a positive integer minor-unit final price and a positive merchant net. Launch also requires `joinMode: 'open'`. Page links are `number | null`. For future store discounts, cap volume uses cash paid after discount.
 - Offer QR issuance locks the campaign and checks status, end time and referral eligibility before finding or creating the pass. The database allows one active pass per customer, campaign and attribution. Requests serialized behind a successful issuance return `200` and the same pass ID, token and code. A redeemed pass allows a new pass while the campaign and referral remain eligible. Campaign close expires outstanding active passes. Use distinct referral code prefixes for marketer and merchant direct links.
+- When the customer and the attributed marketer are the same account, Offer QR issuance and scanner redemption return `403 SELF_PROMOTION_FORBIDDEN`. Redemption checks the stored pass and membership, including passes issued before this rule. A rejected request makes no settlement changes. Merchant-direct offers remain eligible under their existing rules and carry zero marketer commission.
 - Replaying a committed key in the same actor and operation scope with the same validated payload returns the original status and body. A different payload returns `409 IDEMPOTENCY_KEY_REUSED`. A new key on a redeemed pass returns `409 QR_ALREADY_REDEEMED`. For each keyed operation, authenticate and validate the request shape, then claim or replay the key before checking mutable business state. Include the target resource identifier in the fingerprint when the route has one. Serialize concurrent use of the same key and store the successful response atomically with the mutation. This applies to launch and to the sale that closes a campaign.
 - The campaign service owns close and release. Check caps, end time and reserve inside the sale transaction. Close on cap exhaustion, on explicit close, or through expiry reconciliation. Run reconciliation on reads that expose status or balances and in a periodic pass so idle campaigns release their funds. Closing twice returns the ended campaign without another credit. If settlement reaches the cap, close within that transaction and return `campaignStatusAfterSale: 'ended'` and `remainingLockedBudgetSyp: 0` after releasing any surplus. Store that final response for replay.
 - Voucher issuance locks the customer balance, checks available cashback, creates the active reservation and stores the successful idempotency response in one transaction. Cancellation and redemption compete for the same active voucher. Cancellation restores the reservation once. A redeemed voucher rejects cancellation with `409 INVALID_STATUS_TRANSITION`. A cancelled voucher rejects redemption with the same error. A redeemed voucher rejects redemption under a fresh key with `409 QR_ALREADY_REDEEMED`.
