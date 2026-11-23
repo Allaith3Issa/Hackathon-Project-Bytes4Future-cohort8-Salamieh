@@ -18,10 +18,39 @@ const messages: Record<string, string> = {
   IDEMPOTENCY_KEY_REUSED: "تغيّرت بيانات الطلب بعد إرساله. ابدأ محاولة جديدة بعد تحديث الصفحة.",
   INVALID_STATUS_TRANSITION: "لا يمكن تنفيذ هذا الإجراء في الحالة الحالية.",
   QR_ALREADY_REDEEMED: "تم استخدام هذا الرمز من قبل، ولن يُسجَّل البيع مرة ثانية. اطلب من الزبون إصدار بطاقة جديدة.",
+  VOUCHER_EXCEEDS_BILL: "إجمالي الفاتورة أقل من قيمة القسيمة. القسيمة ما زالت فعّالة، أدخل إجمالياً أكبر أو مساوياً.",
   QR_EXPIRED: "انتهت صلاحية هذا الرمز لأن الحملة انتهت. اطلب بطاقة جديدة إن كان العرض ما زال فعّالاً.",
 };
 
 export function staffError(error: unknown) {
   const code = typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
   return typeof code === "string" && Object.hasOwn(messages, code) ? messages[code] : errorMessage(error);
+}
+
+
+export { formatSyp as formatMoney } from "./ui";
+
+const arabicDigits = (v: string) => v.replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 1632));
+const dotted = (v: string) => arabicDigits(v.trim()).replace(/[٫,،]/g, ".");
+
+
+export function parseMoney(input: string): number | null {
+  const m = /^([0-9]{1,14})(?:\.([0-9]{1,2}))?$/.exec(dotted(input));
+  if (!m) return null;
+  const minor = Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0"));
+  return Number.isSafeInteger(minor) ? minor : null;
+}
+
+
+export function parsePositiveMoney(input: string): number | null {
+  const minor = parseMoney(input);
+  return minor !== null && minor > 0 ? minor : null;
+}
+
+
+export function parsePercent(input: string): number | null {
+  const v = dotted(input);
+  if (!/^(100|[0-9]{1,2})(\.[0-9]{1,2})?$/.test(v)) return null;
+  const n = Number(v);
+  return n <= 100 ? n : null;
 }

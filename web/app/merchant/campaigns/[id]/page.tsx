@@ -6,8 +6,8 @@ import { ApiError } from "@/lib/api";
 import { authenticatedRequest } from "@/lib/session";
 import { expiredRedirect, requireRole } from "@/lib/staff";
 import type { MerchantCampaign } from "@/lib/staff-contract";
-import { staffError, statusLabels } from "@/lib/staff-ui";
-import { formatDate, formatNumber, formatSyp } from "@/lib/ui";
+import { staffError, statusLabels, formatMoney } from "@/lib/staff-ui";
+import { formatDate, formatNumber } from "@/lib/ui";
 
 export const metadata: Metadata = { title: "تفاصيل الحملة" };
 
@@ -32,8 +32,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
   const u = c.usage;
   const stats: [string, string][] = [
     ["القطع المباعة", u.maxItems === null ? formatNumber(u.itemsSold) : `${formatNumber(u.itemsSold)} من ${formatNumber(u.maxItems)}`],
-    ["العمولات المدفوعة", formatSyp(u.commissionsPaidSyp)], ["رسوم المنصة المدفوعة", formatSyp(u.platformFeesPaidSyp)],
-    ["الاحتياطي الأقصى", formatSyp(u.worstCaseReserveSyp)],
+    ["العمولات المدفوعة", formatMoney(u.commissionsPaidSyp)], ["رسوم المنصة المدفوعة", formatMoney(u.platformFeesPaidSyp)],
+    ["الاحتياطي الأقصى", formatMoney(u.worstCaseReserveSyp)],
   ];
   return (
     <div className="page-wrap space-y-6 py-7 sm:py-12">
@@ -44,11 +44,11 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       <dl className="grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-ink p-5 text-white sm:p-7">
           <dt className="text-sm font-semibold">الاحتياطي المحجوز حالياً</dt>
-          <dd className="mt-3 text-3xl font-bold tabular-nums sm:text-4xl">{formatSyp(u.lockedBudgetSyp)}</dd>
+          <dd className="mt-3 text-3xl font-bold tabular-nums sm:text-4xl">{formatMoney(u.lockedBudgetSyp)}</dd>
         </div>
         <div className="bg-mauve p-5 sm:p-7">
           <dt className="text-sm font-semibold">سعر البيع للزبون</dt>
-          <dd className="mt-3 text-2xl font-bold tabular-nums">{c.finalPriceSyp === null ? "—" : formatSyp(c.finalPriceSyp)}</dd>
+          <dd className="mt-3 text-2xl font-bold tabular-nums">{c.finalPriceSyp === null ? "—" : formatMoney(c.finalPriceSyp)}</dd>
         </div>
       </dl>
       <dl className="surface grid gap-4 p-5 sm:grid-cols-2 sm:p-6">

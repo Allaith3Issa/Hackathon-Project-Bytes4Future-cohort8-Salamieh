@@ -20,7 +20,7 @@ export async function signIn(
 ): Promise<SignInState> {
   const phone = String(data.get("phone") ?? "").trim();
   const password = String(data.get("password") ?? "");
-  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من ١٠ أرقام يبدأ بـ 09.";
+  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من 10 أرقام يبدأ بـ 09.";
   const passwordError = password ? undefined : "أدخل كلمة المرور.";
   if (phoneError || passwordError) return { phoneError, passwordError };
   try {
@@ -58,7 +58,7 @@ export async function signOut() {
       });
     }
   } catch {
-    // Clear browser credentials even when the API session is already gone.
+     
   } finally {
     await clearSession();
   }
