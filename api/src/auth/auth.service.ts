@@ -7,7 +7,8 @@ import { toMoneyJsonInteger } from '../common/money';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestWithAuth } from './authenticated-actor';
-import { ACCESS_TOKEN_SECONDS, AccountDto, AuthSessionDto, Role } from './auth-session.dto';
+import { accountRoles } from './account-roles';
+import { ACCESS_TOKEN_SECONDS, AccountDto, AuthSessionDto } from './auth-session.dto';
 import { LoginDto } from './login.dto';
 import { RegisterDto } from './register.dto';
 
@@ -49,19 +50,13 @@ function authFailure(error: unknown, message: string): never {
 }
 
 function mapAccount(record: AccountRecord): AccountDto {
-  const roles: Role[] = [];
-  if (record.isAdmin) roles.push('admin');
-  if (record.isCustomer) roles.push('customer');
-  if (record.isMarketer) roles.push('marketer');
-  if (record.merchantProfile) roles.push('merchant');
-
   const merchant = record.merchantProfile;
   const customer = record.customerProfile;
   return {
     id: record.id,
     name: record.name,
     phone: record.phone,
-    roles,
+    roles: accountRoles(record),
     createdAt: record.createdAt.toISOString(),
     merchant: merchant ? {
       name: merchant.shopName,
