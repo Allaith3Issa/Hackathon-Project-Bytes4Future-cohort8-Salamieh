@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #fbf7f2;
+  --color-ink: #503c44;
+  --color-muted: #6f555f;
+  --color-rule: #ddcbd0;
+  --color-control: #987582;
+  --color-dusty-mauve: #b78391;
+  --color-mauve: #f3e6e8;
+  --color-action: #b54718;
+  --color-action-hover: #943710;
+  --color-success: #315d47;
+  --color-success-bg: #edf5ef;
+  --color-danger: #982d3d;
+  --color-info: #534767;
+  --color-info-bg: #f1edf5;
+  --font-sans: "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif;
+}
+
+@layer base {
+  body { @apply bg-canvas font-sans text-ink; }
+  :focus-visible { @apply outline-2 outline-offset-4 outline-action; }
+  ::selection { @apply bg-mauve text-ink; }
+  input:not([type="hidden"]) {
+    @apply min-h-12 w-full rounded-lg border border-control bg-white px-3 text-ink caret-action;
+  }
+  input[aria-invalid="true"] { @apply border-danger; }
+  label { @apply text-sm font-semibold; }
+}
+
+@layer components {
+  .page-wrap { @apply mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8; }
+  .button-primary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-action px-5 py-2 text-center font-semibold text-white motion-safe:transition-colors hover:bg-action-hover active:bg-action-hover disabled:cursor-not-allowed disabled:hover:bg-action disabled:opacity-65;
+  }
+  .button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-control px-4 py-2 text-center font-semibold motion-safe:transition-colors hover:bg-mauve active:bg-mauve;
+  }
+  .text-link { @apply font-semibold text-action underline underline-offset-4; }
+  .surface { @apply rounded-xl border border-rule bg-white; }
+  .notice { @apply rounded-lg bg-info-bg px-4 py-3 text-sm leading-7 text-info; }
+  .notice-error { @apply rounded-lg border border-danger/30 bg-white px-4 py-3 text-sm leading-7 text-danger; }
+  .page-title { @apply text-2xl leading-tight font-bold sm:text-3xl; }
+  .brand-mark { @apply grid size-9 shrink-0 place-items-center rounded-lg bg-dusty-mauve text-xl font-semibold leading-none text-ink; }
+  .milestone-meter {
+    @apply block h-2 w-full overflow-hidden rounded-full bg-mauve accent-action;
+  }
+  .milestone-meter::-webkit-progress-bar { @apply bg-mauve; }
+  .milestone-meter::-webkit-progress-value { @apply rounded-full bg-action; }
+  .milestone-meter::-moz-progress-bar { @apply rounded-full bg-action; }
+}

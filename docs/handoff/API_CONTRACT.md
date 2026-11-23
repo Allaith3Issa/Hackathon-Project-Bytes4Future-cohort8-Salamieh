@@ -8,7 +8,7 @@ This contract aligns with [DATABASE_ERD.md](DATABASE_ERD.md) and [Affiliate Mark
 
 ## Conventions
 
-- Use JSON and camelCase. IDs are UUID strings unless noted. Timestamps use UTC ISO 8601. Phone numbers match `^09[0-9]{8}$`. Monetary fields ending in `Syp` carry nonnegative JSON integers in minor units of the new Syrian Pound. Existing field names and JSON types are retained for MVP client compatibility. See [Monetary limits and precision](#monetary-limits-and-precision).
+- Use JSON and camelCase. IDs are UUID strings unless noted. Timestamps use UTC ISO 8601. Phone numbers match `^09[0-9]{8}$`. Amounts ending in `Syp` are nonnegative whole SYP integers. See [Monetary limits and precision](#monetary-limits-and-precision).
 - Protected routes use `Authorization: Bearer <accessToken>`. One user may hold multiple public roles (`customer`, `marketer`, `merchant`). Validate role and resource ownership on every protected request. Provision `admin` out of band.
 - Return single resources directly. Paginated lists accept `page` (default `1`) and `pageSize` (default `20`, max `100`) and return `{ items, page, pageSize, total, previousPage, nextPage }`. Default sort is newest first with ID tie-breaker unless specified.
 - Backend calculates every display figure (pricing, worst-case reserve, cashback splits, balances, totals, conversion rates, ranks, pagination). Frontends never duplicate business arithmetic.
@@ -78,7 +78,7 @@ type AuthSession = {
 };
 ```
 
-Web (`web/`) stores `accessToken` and `refreshToken` inside server-managed `HttpOnly` cookies via a Next.js session boundary. React Native (Expo) stores them in Secure Storage and sends `Authorization: Bearer <accessToken>`.
+Web (`frontend/`) stores `accessToken` and `refreshToken` inside server-managed `HttpOnly` cookies via a Next.js session boundary. React Native (Expo) stores them in Secure Storage and sends `Authorization: Bearer <accessToken>`.
 
 ## Campaigns and participation
 
@@ -510,17 +510,13 @@ type AdminOverview = {
 
 ## Monetary limits and precision
 
-- One new SYP equals 100 minor units. Since 100 old SYP equals one new SYP, a verified old whole-SYP integer carries over unchanged as a minor-unit integer. For example, `100000` means `1,000.00` new SYP on screen. Monetary fields in requests, responses and stored idempotency responses all use minor units.
-- Validate every monetary input as a JSON integer from `0` through `9_007_199_254_740_991` inclusive. Prices, bill amounts, sales caps, top-ups, cashback vouchers and payouts must be positive. A fixed commission may be zero. Validate `maxItems` as an integer from `1` through `2_147_483_647`, matching the database column. Out-of-range inputs return `400 VALIDATION_ERROR`.
-- Accept percentages with up to two decimal places. Parse percentages exactly into integer basis points. Use `bigint` for monetary products, divisions and sums. For nonnegative amounts, floor to one minor unit only at the points specified in the pricing rules. Validate the final monetary value before converting it to a JavaScript number or writing it to a `bigint` money column.
-- Apply the same minor-unit range to calculated amounts and each resulting financial balance or monetary counter the operation persists. If a derived amount falls outside that range, return `409 AMOUNT_OUT_OF_RANGE` and roll back the operation, including its ledger entries and any reservation. Apply the same check to read-only previews. Calculate reported aggregates exactly and return `409 AMOUNT_OUT_OF_RANGE` if an amount in the response cannot fit in the supported range.
-- Web and Expo display amounts in new SYP by formatting the integer quotient and fractional remainder at a scale of 100. Parse localized monetary input with up to two fractional digits into minor units before sending it. For example, `12.34` new SYP becomes `1234`. Keep monetary input parsing separate from percentage and quantity parsing and use integer arithmetic at this boundary.
+- Validate every SYP input as a JSON integer from `0` through `9_007_199_254_740_991` inclusive. Prices, bill amounts, sales caps, top-ups, cashback vouchers and payouts must be positive. A fixed commission may be zero. Validate `maxItems` as an integer from `1` through `2_147_483_647`, matching the database column. Out-of-range inputs return `400 VALIDATION_ERROR`.
+- Accept percentages with up to two decimal places. Convert them to integer basis points and use integer or exact decimal arithmetic for intermediate products, divisions and sums. For nonnegative amounts, floor at the points specified in the pricing rules. Validate the final monetary value before converting it to a JavaScript number or writing it to a `bigint` money column.
+- Apply the same SYP range to calculated amounts and each resulting financial balance or monetary counter the operation persists. If a derived amount falls outside that range, return `409 AMOUNT_OUT_OF_RANGE` and roll back the operation, including its ledger entries and any reservation. Apply the same check to read-only previews. Calculate reported aggregates exactly and return `409 AMOUNT_OUT_OF_RANGE` if an amount in the response cannot fit in the supported range.
 
 ## Calculation and consistency rules
 
-All monetary operands and results below are integer minor units. Percentages, item quantities and counts retain their own units.
-
-1. Validate `discountPercent` in `0..100`, `commission.percent` in `0..100`, nonnegative integer minor-unit values, future `endsAt`, valid HTTP/HTTPS `imageUrl`, and positive cap (`maxItems` for `product`, `maxSalesVolumeSyp` for `store_discount`). Apply the monetary and precision limits above.
+1. Validate `discountPercent` in `0..100`, `commission.percent` in `0..100`, nonnegative integer SYP values, future `endsAt`, valid HTTP/HTTPS `imageUrl`, and positive cap (`maxItems` for `product`, `maxSalesVolumeSyp` for `store_discount`). Apply the monetary and precision limits above.
 2. `finalPriceSyp = floor(originalPriceSyp × (1 - discountPercent / 100))`.
 3. Every sale calculates on the backend inside an atomic DB transaction:
    - `customerPaidCashSyp = finalPriceSyp × quantity` (for `product`) OR `floor(originalBillSyp × (1 - discountPercent / 100))` (for `store_discount`).
@@ -530,45 +526,41 @@ All monetary operands and results below are integer minor units. Percentages, it
    - `marketerCommissionSyp = 0` for `merchant_direct`, else `commissionPerItemSyp × quantity` (`fixed`) or `floor(customerPaidCashSyp × commission.percent / 100)` (`percentage`).
    - `totalDeductedReserveSyp = marketerCommissionSyp + platformTotalFeeSyp`.
 4. Campaign creation checks `merchant.availableBalanceSyp >= worstCaseReserveSyp` under the merchant wallet lock. Commit the new campaign, reserve transfer, ledger movement and saved launch response together. Every scan checks `campaign.lockedBudgetSyp >= totalDeductedReserveSyp` under a row lock.
-5. Customer cashback unlocks from `lockedCashbackSyp` to `availableCashbackSyp` when `milestonePurchaseCount >= 5` and `milestoneSpendSyp >= 50000` (500.00 new SYP). Both thresholds are configurable. Cashback is backed by the 2% pool collected inside `platformTotalFeeSyp`.
+5. Customer cashback unlocks from `lockedCashbackSyp` to `availableCashbackSyp` when `milestonePurchaseCount >= 5` and `milestoneSpendSyp >= 50000` (configurable thresholds, strictly backed by the 2% pool already collected inside `platformTotalFeeSyp`).
 6. Conversion rate = `(itemsSold / clicks) × 100` rounded to 2 decimals (`0` when `clicks === 0`).
 
 
 ## Demo operation rules and shared examples
 
 - `lookup` and both redemption routes accept a QR token or the matching human-readable code. Offer lookup and redemption require a verified merchant who owns the campaign. An out-of-scope code returns `404 NOT_FOUND` without disclosing customer details. Lookup returns the cash amount for quantity 1 before confirmation. The redemption response returns the settlement breakdown.
-- Demo offer redemption accepts `{ code }` or `{ code, quantity: 1 }`. Other quantities and `originalBillSyp` return `400 VALIDATION_ERROR`. Demo campaign preview and launch accept product campaigns with fixed commission, a positive integer minor-unit final price and a positive merchant net. Launch also requires `joinMode: 'open'`. Page links are `number | null`. For future store discounts, cap volume uses cash paid after discount.
+- Demo offer redemption accepts `{ code }` or `{ code, quantity: 1 }`. Other quantities and `originalBillSyp` return `400 VALIDATION_ERROR`. Demo campaign preview and launch accept product campaigns with fixed commission, a positive whole-SYP final price and a positive merchant net. Launch also requires `joinMode: 'open'`. Page links are `number | null`. For future store discounts, cap volume uses cash paid after discount.
 - Offer QR issuance locks the campaign and checks status, end time and referral eligibility before finding or creating the pass. The database allows one active pass per customer, campaign and attribution. Requests serialized behind a successful issuance return `200` and the same pass ID, token and code. A redeemed pass allows a new pass while the campaign and referral remain eligible. Campaign close expires outstanding active passes. Use distinct referral code prefixes for marketer and merchant direct links.
 - Replaying a committed key in the same actor and operation scope with the same validated payload returns the original status and body. A different payload returns `409 IDEMPOTENCY_KEY_REUSED`. A new key on a redeemed pass returns `409 QR_ALREADY_REDEEMED`. For each keyed operation, authenticate and validate the request shape, then claim or replay the key before checking mutable business state. Include the target resource identifier in the fingerprint when the route has one. Serialize concurrent use of the same key and store the successful response atomically with the mutation. This applies to launch and to the sale that closes a campaign.
 - The campaign service owns close and release. Check caps, end time and reserve inside the sale transaction. Close on cap exhaustion, on explicit close, or through expiry reconciliation. Run reconciliation on reads that expose status or balances and in a periodic pass so idle campaigns release their funds. Closing twice returns the ended campaign without another credit. If settlement reaches the cap, close within that transaction and return `campaignStatusAfterSale: 'ended'` and `remainingLockedBudgetSyp: 0` after releasing any surplus. Store that final response for replay.
 - Voucher issuance locks the customer balance, checks available cashback, creates the active reservation and stores the successful idempotency response in one transaction. Cancellation and redemption compete for the same active voucher. Cancellation restores the reservation once. A redeemed voucher rejects cancellation with `409 INVALID_STATUS_TRANSITION`. A cancelled voucher rejects redemption with the same error. A redeemed voucher rejects redemption under a fresh key with `409 QR_ALREADY_REDEEMED`.
 - For the voucher extension, use a standalone checkout. The merchant enters `billTotalSyp` after shop discounts and before applying the voucher. It must be a positive safe JSON integer. If `billTotalSyp < amountSyp`, return `409 VOUCHER_EXCEEDS_BILL` and keep the voucher active. Otherwise consume the reservation and credit a verified merchant atomically. Return `customerPaidCashSyp = billTotalSyp - amountSyp`. Active voucher balances count toward the admin cashback liability.
 
-The figures below are in minor units. Human-facing prices and balances display the corresponding new-SYP amount with up to two fractional digits.
-
 | Scenario | Shared fixture and expected result |
 | --- | --- |
-| Insufficient balance | Merchant has 100000 minor units and launch needs 435000. Return `409 INSUFFICIENT_MERCHANT_BALANCE`. |
+| Insufficient balance | Merchant has 100000 SYP and launch needs 435000. Return `409 INSUFFICIENT_MERCHANT_BALANCE`. |
 | Top-up and launch | Top up 400000. Product price 100000, discount 10%, fixed commission 10000, maxItems 30, `joinMode: 'open'`, product name and description, a valid image URL, and an end time after the demo. Launch locks 435000 and leaves 65000 available. |
 | Lookup and sale | Use the freshly issued pass in the live rehearsal or `OF-DEMO01` in the scanner fixture. Lookup previews 90000 cash. Redeem with a UUID key and return `201` with cash 90000, commission 10000, fee 4500, cashback 1800, net fee 2700, and reserve 420500. |
 | Replays | Retry identical body and key to get the original `201` and sale ID. Use another key for the same pass to get `409 QR_ALREADY_REDEEMED`. |
 | Close | Close after that one sale. Release 420500, leaving 485500 available and zero locked. |
-| Launch retry | In a separate fixture with enough funds for two reserves, resend the same launch body and key after a lost response. Expect the same `201` and campaign ID, with one reserve lock of 435000 minor units. Reusing the key with a changed valid body returns `409 IDEMPOTENCY_KEY_REUSED`. |
+| Launch retry | In a separate fixture with enough funds for two reserves, resend the same launch body and key after a lost response. Expect the same `201` and campaign ID, with one 435000 SYP reserve lock. Reusing the key with a changed valid body returns `409 IDEMPOTENCY_KEY_REUSED`. |
 | Concurrent issuance | Request an Offer QR twice in parallel for the same eligible customer, campaign and referral. Expect one `201` and one `200` with the same pass ID and code. |
-| Final sale | In a separate fixture use the same final price of 90000 and commission of 10000, with `maxItems: 1`. The sale debits 14500 minor units from the reserve and returns `campaignStatusAfterSale: 'ended'` and `remainingLockedBudgetSyp: 0`. Same-key retry returns the original `201` and sale ID. Explicit close adds no wallet credit. |
-| Monetary boundary | With zero discount and commission, `originalPriceSyp: 9007199254740991` and `maxItems: 21` produce an exact reserve of 9457559217478029 minor units. Preview and launch return `409 AMOUNT_OUT_OF_RANGE`. The launch writes no campaign, reserve or ledger movement. An input amount of `9007199254740992` returns `400 VALIDATION_ERROR`. |
+| Final sale | In a separate fixture use the same 90000 SYP final price and 10000 SYP commission with `maxItems: 1`. The sale charges 14500 SYP and returns `campaignStatusAfterSale: 'ended'` and `remainingLockedBudgetSyp: 0`. Same-key retry returns the original `201` and sale ID. Explicit close adds no wallet credit. |
+| Monetary boundary | With zero discount and commission, `originalPriceSyp: 9007199254740991` and `maxItems: 21` produce an exact reserve of 9457559217478029 SYP. Preview and launch return `409 AMOUNT_OUT_OF_RANGE`. The launch writes no campaign, reserve or ledger movement. An input amount of `9007199254740992` returns `400 VALIDATION_ERROR`. |
 
 ### Shared demo seed and API examples
 
 Allaith publishes the resettable seed values and matching request and response samples on Day 1. Give web and Expo the public web and API base URLs, role identities, and the scanner fixture's campaign ID, membership ID, referral URL and pass code. Provide demo credentials through the team's private setup and keep them out of the documents and source control.
 
-The JSON examples and fixture amounts use minor units. For example, the scanner's `90000` cash price displays as `900.00` new SYP.
-
 | Fixture | Starting state and purpose |
 | --- | --- |
-| Live rehearsal | Seed an admin, a verified merchant with 100000 minor units available, a marketer and a customer. Start without the live rehearsal campaign. The team creates it after the top-up, joins it from Expo, and issues its pass through the web flow. |
-| Scanner development | Use an independent seed or database reset with a funded, active product campaign, approved marketer membership, customer and active Offer QR code `OF-DEMO01`. The campaign owner can preview and redeem this code while live QR issuance is being built. Use the same final price of 90000, commission of 10000 and 30-item cap as the live rehearsal, with 435000 already reserved and zero sales. |
-| Voucher extension | Seed four settled purchases of 40000 each for the customer in the current milestone cycle. The customer starts at 4 purchases, 160000 of cycle spend and 3200 of locked cashback. The sale of 90000 adds 1800, so the fifth purchase unlocks 5000. Seed a second verified merchant to accept the voucher. Use a separate reset for the voucher integration tests that start with 10000 available. |
+| Live rehearsal | Seed an admin, a verified merchant with 100000 SYP available, a marketer and a customer. Start without the live rehearsal campaign. The team creates it after the top-up, joins it from Expo, and issues its pass through the web flow. |
+| Scanner development | Use an independent seed or database reset with a funded, active product campaign, approved marketer membership, customer and active Offer QR code `OF-DEMO01`. The campaign owner can preview and redeem this code while live QR issuance is being built. Use the same 90000 SYP final price, 10000 SYP commission and 30-item cap as the live rehearsal, with 435000 SYP already reserved and zero sales. |
+| Voucher extension | Seed four settled purchases of 40000 SYP each for the customer in the current milestone cycle. The customer starts at 4 purchases, 160000 SYP of cycle spend and 3200 SYP locked cashback. The 90000 SYP sale adds 1800 SYP, so the fifth purchase unlocks 5000 SYP. Seed a second verified merchant to accept the voucher. Use a separate reset for the voucher integration tests that start with 10000 SYP available. |
 
 The live rehearsal starts with admin top-up, then merchant preview and launch. The marketer calls `POST /marketer/campaigns/{campaignId}/join` with no body and shares the returned `referralUrl`. The web opens `/r/[code]` and calls `GET /public/referrals/{code}` for offer details. The signed-in customer calls `POST /customer/referrals/{code}/offer-qr` with no body. Use the returned `passCode` for merchant lookup and redemption. After settlement, refresh `GET /marketer/wallet` and `GET /customer/dashboard` before closing the campaign.
 

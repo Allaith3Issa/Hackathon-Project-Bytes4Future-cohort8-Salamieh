@@ -1,18 +1,17 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from './auth/auth.module';
-import { CampaignModule } from './campaign/campaign.module';
 import { HealthModule } from './health/health.module';
-import { validateDatabaseConfig } from './prisma/database-config';
-import { PrismaModule } from './prisma/prisma.module';
+import { DatabaseModule } from './database/database.module';
+import { FinancialModule } from './financial/financial.module';
+import { CampaignModule } from './campaign/campaign.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validate: validateDatabaseConfig }),
-    HealthModule,
-    PrismaModule,
-    AuthModule,
+    ConfigModule.forRoot({ isGlobal: true }),
+    DatabaseModule,
     CampaignModule,
+    FinancialModule,
+    HealthModule,
   ],
 })
 export class AppModule {}

@@ -1,20 +1,41 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { MAX_MONEY_MINOR_UNITS, toMoneyJsonInteger } = require('../dist/common/money');
+const { calculateOfferAmounts } = require('../dist/common/money');
 
-test('money serializes as safe minor-unit integers without rescaling', () => {
-  for (const amount of [0n, 1n, 100_000n, MAX_MONEY_MINOR_UNITS]) {
-    const serialized = JSON.parse(JSON.stringify(toMoneyJsonInteger(amount)));
-    assert.ok(Number.isSafeInteger(serialized));
-    assert.equal(BigInt(serialized), amount);
-  }
-  const example = BigInt(toMoneyJsonInteger(100_000n));
-  const displayed = `${example / 100n}.${String(example % 100n).padStart(2, '0')}`;
-  assert.equal(displayed, '1000.00');
+test('calculates the demo sale and keeps the cashback split reconciled', () => {
+  const amounts = calculateOfferAmounts({
+    originalPriceSyp: 100000,
+    discountPercent: '10',
+    fixedCommissionSyp: '10000.00',
+  });
+
+  assert.deepEqual(amounts, {
+    originalAmountSyp: 100000n,
+    customerPaidCashSyp: 90000n,
+    marketerCommissionSyp: 10000n,
+    platformTotalFeeSyp: 4500n,
+    customerCashbackSyp: 1800n,
+    platformNetFeeSyp: 2700n,
+    totalDeductedReserveSyp: 14500n,
+  });
+  assert.equal(
+    amounts.platformNetFeeSyp + amounts.customerCashbackSyp,
+    amounts.platformTotalFeeSyp,
+  );
 });
 
-test('money serialization rejects negative and overflowing bigint amounts', () => {
-  assert.equal(MAX_MONEY_MINOR_UNITS, BigInt(Number.MAX_SAFE_INTEGER));
-  assert.throws(() => toMoneyJsonInteger(-1n), RangeError);
-  assert.throws(() => toMoneyJsonInteger(MAX_MONEY_MINOR_UNITS + 1n), RangeError);
+test('rejects derived SYP values above the safe integer limit', () => {
+  assert.throws(
+    () =>
+      calculateOfferAmounts({
+        originalPriceSyp: Number.MAX_SAFE_INTEGER,
+        discountPercent: 0,
+        fixedCommissionSyp: Number.MAX_SAFE_INTEGER,
+      }),
+    (error) => {
+      assert.equal(error.getStatus(), 409);
+      assert.equal(error.getResponse().code, 'AMOUNT_OUT_OF_RANGE');
+      return true;
+    },
+  );
 });
