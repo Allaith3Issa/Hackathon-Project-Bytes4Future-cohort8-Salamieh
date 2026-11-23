@@ -42,6 +42,7 @@ export class ScannerController {
   @ApiOperation({ summary: 'Confirm cash collection and redeem one product Offer QR', description: 'Submit only after the customer has paid the merchant in cash. Omit quantity or send 1.' })
   @ApiHeader({ name: 'Idempotency-Key', required: true, schema: { type: 'string', format: 'uuid' } })
   @ApiCreatedResponse({ type: OfferRedeemResultDto })
+  @ApiResponse({ status: 403, type: AuthErrorDto, description: 'FORBIDDEN, MERCHANT_NOT_VERIFIED or SELF_PROMOTION_FORBIDDEN' })
   @ApiResponse({ status: 409, type: AuthErrorDto, description: 'IDEMPOTENCY_KEY_REUSED, QR_ALREADY_REDEEMED, QR_EXPIRED, CAMPAIGN_ENDED, CAMPAIGN_LIMIT_EXCEEDED, INSUFFICIENT_LOCKED_BUDGET or AMOUNT_OUT_OF_RANGE' })
   async redeem(@CurrentActor() actor: AuthenticatedActor, @IdempotencyKey() key: string, @Body() input: RedeemOfferDto) {
     const response = await this.scanner.redeem(actor.userId, key, input.code);

@@ -141,11 +141,14 @@ export class ScannerService {
     const pass = await tx.offerQrPass.findUniqueOrThrow({ where: { id: passLock.id }, include: settlementRelations });
     if (pass.qrToken !== code && pass.passCode !== code) throw passNotFound();
     if (pass.campaignMarketerId !== null) {
-      const [membership] = await tx.$queryRaw<{ id: string }[]>`
-        SELECT id FROM campaign_marketers WHERE id = ${pass.campaignMarketerId}::uuid
+      const [membership] = await tx.$queryRaw<{ marketerId: string }[]>`
+        SELECT marketer_id AS "marketerId" FROM campaign_marketers WHERE id = ${pass.campaignMarketerId}::uuid
         AND campaign_id = ${pass.campaignId}::uuid AND status = 'approved' FOR SHARE
       `;
-      if (!membership) throw passNotFound();
+      if (!membership || membership.marketerId !== pass.campaignMarketer?.marketerId) throw passNotFound();
+      if (membership.marketerId === pass.customerId) {
+        throw new ForbiddenException({ statusCode: 403, code: 'SELF_PROMOTION_FORBIDDEN', message: 'You cannot use your own marketer referral for a purchase.' });
+      }
     }
     const { campaign } = pass;
     const { originalAmountSyp, pricing, totalDeductedReserveSyp, finalSale } = await this.quote(tx, pass);
