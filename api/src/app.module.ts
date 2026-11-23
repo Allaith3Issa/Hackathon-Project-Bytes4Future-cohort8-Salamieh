@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { AdminMerchantModule } from './admin/admin-merchant.module';
 import { AuthModule } from './auth/auth.module';
 import { CampaignModule } from './campaign/campaign.module';
 import { HealthModule } from './health/health.module';
@@ -17,6 +18,7 @@ import { ScannerModule } from './scanner/scanner.module';
     CampaignModule,
     ReferralModule,
     ScannerModule,
+    AdminMerchantModule,
   ],
 })
 export class AppModule {}
