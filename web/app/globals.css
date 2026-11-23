@@ -20,6 +20,7 @@
 
 @layer base {
   body { @apply bg-canvas font-sans text-ink; }
+  html:lang(en) body { font-family: "IBM Plex Sans", "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif; }
   :focus-visible { @apply outline-2 outline-offset-4 outline-action; }
   ::selection { @apply bg-mauve text-ink; }
   input:not([type="hidden"]) {

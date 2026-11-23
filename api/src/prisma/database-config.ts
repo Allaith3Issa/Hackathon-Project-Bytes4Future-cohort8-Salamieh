@@ -1,6 +1,11 @@
+export class ApiConfigurationError extends Error {}
+
 export function validateDatabaseConfig(config: Record<string, unknown>) {
   const connectionString = config.DATABASE_URL;
   if (connectionString === undefined) {
+    if (config.NODE_ENV === 'production') {
+      throw new ApiConfigurationError('DATABASE_URL is required in production.');
+    }
     return config;
   }
 
@@ -15,5 +20,5 @@ export function validateDatabaseConfig(config: Record<string, unknown>) {
     }
   }
 
-  throw new Error('DATABASE_URL must be a PostgreSQL URL with a host and database name.');
+  throw new ApiConfigurationError('DATABASE_URL must be a PostgreSQL URL with a host and database name.');
 }

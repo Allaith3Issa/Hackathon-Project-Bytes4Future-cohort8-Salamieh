@@ -1,9 +1,10 @@
 "use server";
 
+import { getI18n, redirectLocalized } from "@/lib/i18n-server";
 import QRCode from "qrcode";
-import { redirect } from "next/navigation";
 import { apiRequest, ApiError } from "@/lib/api";
 import type { AuthSession, OfferQrPass } from "@/lib/contract";
+import { publicAccountDestination } from "@/lib/public-account-destination";
 import { authenticatedRequest, clearSession, saveSession, sessionTokens } from "@/lib/session";
 import { errorMessage, validReferral } from "@/lib/ui";
 
@@ -14,37 +15,42 @@ export interface SignInState {
 }
 
 export async function signIn(
-  returnTo: string,
+  { offer, customerOnly }: { offer?: string; customerOnly?: boolean },
   _state: SignInState,
   data: FormData,
 ): Promise<SignInState> {
+  const { t } = await getI18n();
   const phone = String(data.get("phone") ?? "").trim();
   const password = String(data.get("password") ?? "");
-  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : "أدخل رقم جوال سورياً من 10 أرقام يبدأ بـ 09.";
-  const passwordError = password ? undefined : "أدخل كلمة المرور.";
+  const phoneError = /^09[0-9]{8}$/.test(phone) ? undefined : t("auth.syrianPhone");
+  const passwordError = password ? undefined : t("auth.passwordRequired");
   if (phoneError || passwordError) return { phoneError, passwordError };
+  let destination: string;
   try {
     const session = await apiRequest<AuthSession>("/auth/login", {
       method: "POST",
       body: { phone, password },
     });
-    if (!session.user.roles.includes("customer")) {
-      return { error: "سجّل الدخول باستخدام حساب عميل للوصول إلى عروضك." };
+    if (customerOnly && !session.user.roles.includes("customer")) {
+      return { error: t("auth.signInWithACustomerAccount") };
     }
+    const target = publicAccountDestination(session.user.roles, offer);
+    if (!target) return { error: t("auth.thisAccountDoesNotHaveA") };
+    destination = target;
     await saveSession(session);
   } catch (error) {
     if (error instanceof ApiError && error.code === "VALIDATION_ERROR") {
       const fields = error.fields;
       if (fields?.phone || fields?.password) {
         return {
-          phoneError: fields.phone ? "تحقّق من رقم الجوال." : undefined,
-          passwordError: fields.password ? "تحقّق من كلمة المرور." : undefined,
+          phoneError: fields.phone ? t("auth.checkYourPhoneNumber") : undefined,
+          passwordError: fields.password ? t("auth.checkYourPassword") : undefined,
         };
       }
     }
-    return { error: errorMessage(error) };
+    return { error: errorMessage(error, t) };
   }
-  redirect(returnTo.startsWith("/r/") && validReferral(returnTo.slice(3)) ? returnTo : "/customer");
+  return redirectLocalized(destination);
 }
 
 export async function signOut() {
@@ -62,7 +68,7 @@ export async function signOut() {
   } finally {
     await clearSession();
   }
-  redirect("/login");
+  return redirectLocalized("/login");
 }
 
 export async function recordReferralClick(code: string) {
@@ -76,7 +82,8 @@ export interface PassState {
 }
 
 export async function issueOfferPass(code: string, _state: PassState): Promise<PassState> {
-  if (!validReferral(code)) return { error: "لم نعثر على رابط الإحالة." };
+  const { t } = await getI18n();
+  if (!validReferral(code)) return { error: t("auth.weCouldnTFindTheReferral") };
   try {
     const pass = await authenticatedRequest<OfferQrPass>(`/customer/referrals/${code}/offer-qr`, {
       method: "POST",
@@ -85,6 +92,6 @@ export async function issueOfferPass(code: string, _state: PassState): Promise<P
       .catch(() => null);
     return { pass: { code: pass.passCode, image } };
   } catch (error) {
-    return { error: errorMessage(error) };
+    return { error: errorMessage(error, t) };
   }
 }
