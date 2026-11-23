@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { validateDatabaseConfig } from './prisma/database-config';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferralModule } from './referral/referral.module';
+import { ReportingModule } from './reporting/reporting.module';
 import { ScannerModule } from './scanner/scanner.module';
 
 @Module({
@@ -19,6 +20,7 @@ import { ScannerModule } from './scanner/scanner.module';
     ReferralModule,
     ScannerModule,
     AdminMerchantModule,
+    ReportingModule,
   ],
 })
 export class AppModule {}
