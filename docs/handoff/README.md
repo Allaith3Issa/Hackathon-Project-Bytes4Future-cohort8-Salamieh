@@ -6,7 +6,7 @@ Local affiliate marketing and cashback platform connecting small businesses in S
 
 ## Core Architecture & Tech Stack
 
-- **Web Frontend (`frontend/`)**: Next.js + TypeScript (Arabic RTL)
+- **Web Frontend (`web/`)**: Next.js + TypeScript (Arabic RTL)
 - **Backend API (`api/`)**: NestJS + TypeScript + Swagger (`/api/v1`)
 - **Database**: PostgreSQL (single source of truth; no direct DB access from web or mobile)
 - **Mobile App (separate repo)**: React Native with Expo + TypeScript (Marketer Android app)
@@ -26,4 +26,4 @@ Use the [shared demo seed and API examples](API_CONTRACT.md#shared-demo-seed-and
 - [Three-Day Roadmap](HACKATHON_ROADMAP.md) — Parallel build plan and checkpoints
 - [Backend Agent Instructions](backend/AGENTS.md) — NestJS implementation and security rules
 - [Frontend Agent Instructions](frontend/AGENTS.md) — Next.js implementation and Arabic RTL rules
-- [Frontend Design Guide](frontend/design.md) — Color tokens, typography, and screen layouts
+- [Frontend Design Guide](../../web/design.md) — Color tokens, typography, and screen layouts
