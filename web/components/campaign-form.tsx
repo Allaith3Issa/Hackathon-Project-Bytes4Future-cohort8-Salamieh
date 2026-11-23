@@ -72,7 +72,7 @@ export function CampaignForm() {
         )}
         {state.error && <p role="alert" className="notice-error">{state.error}</p>}
         <div className="grid gap-3">
-          <button type="submit" name="intent" value="preview" className="button-secondary" disabled={pending || !key}>حساب السعر والاحتياطي</button>
+          <button type="submit" name="intent" value="preview" className="button-secondary" disabled={pending}>حساب السعر والاحتياطي</button>
           <button type="submit" name="intent" value="launch" className="button-primary" disabled={pending || !key || !p || !p.isAffordableByMerchant}>
             {pending ? "جارٍ المعالجة…" : state.error ? "إعادة محاولة الإطلاق" : "إطلاق الحملة"}
           </button>

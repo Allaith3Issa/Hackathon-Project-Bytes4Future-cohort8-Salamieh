@@ -82,7 +82,6 @@ export interface CampaignState {
 export async function campaignAction(state: CampaignState, data: FormData): Promise<CampaignState> {
   const launch = text(data, "intent") === "launch";
   const key = text(data, "key");
-  if (!uuid.test(key)) return { error: KEY_ERROR };
   const preview = state.preview?.key === key ? state.preview : undefined;
   const price = parseMoney(text(data, "originalPriceSyp"));
   const commission = parseMoney(text(data, "commissionSyp"));
@@ -105,6 +104,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
     if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= Date.now()) errors.endsAt = "اختر موعد انتهاء في المستقبل.";
   }
   if (Object.keys(errors).length) return { preview, errors };
+  if (!uuid.test(key)) return { error: KEY_ERROR };
   const base = {
     campaignType: "product", originalPriceSyp: price, discountPercent: discount,
     commission: { type: "fixed", amountSyp: commission }, maxItems,
@@ -121,7 +121,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
     redirect(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
   } catch (error) {
     if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error) };
-    throw error; 
+    throw error;
   }
 }
 
@@ -171,7 +171,6 @@ export async function redeemVoucher(
     return { result: await authenticatedRequest<VoucherRedeemResult>("/merchant/scanner/redeem-voucher", { method: "POST", idempotencyKey: key, body: { code: code.trim(), billTotalSyp: bill } }) };
   } catch (error) {
     if (error instanceof ApiError) {
-     
       if (error.status >= 500 || error.code === "RATE_LIMITED") return { error: staffError(error), outcome: "uncertain" };
       if (error.code === "VOUCHER_EXCEEDS_BILL") return { error: staffError(error), outcome: "exceeds" };
     }

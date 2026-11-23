@@ -21,7 +21,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
   const [key, renewKey] = useAttemptKey();
   const [v, setV] = useState(empty);
   const [reviewAt, setReviewAt] = useState<{ errors: typeof state.errors } | null>(null);
-  
+
   const review = reviewAt !== null && reviewAt.errors === state.errors;
   const [local, setLocal] = useState<Record<string, string>>({});
   const errors = { ...state.errors, ...local };
@@ -32,7 +32,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
   const set = (name: keyof typeof empty, value: string) => {
     setV((old) => ({ ...old, [name]: value }));
     setLocal({});
-    renewKey(); 
+    renewKey();
   };
 
   if (state.result) {
@@ -62,7 +62,10 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
     if (!parseMoney(v.amount) ) found.amount = "أدخل مبلغاً صحيحاً أكبر من صفر (حتى منزلتين عشريتين).";
     if (!v.note.trim()) found.note = "أدخل مرجع الدفع.";
     setLocal(found);
-    if (!Object.keys(found).length) setReviewAt({ errors: state.errors });
+    if (!Object.keys(found).length) {
+      if (!key) renewKey();
+      setReviewAt({ errors: state.errors });
+    }
   };
 
   return (
