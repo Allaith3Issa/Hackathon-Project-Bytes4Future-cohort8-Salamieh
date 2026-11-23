@@ -5,11 +5,13 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { CampaignPreviewController } from './campaign-preview.controller';
 import { CampaignPreviewService } from './campaign-preview.service';
 import { CampaignService } from './campaign.service';
+import { MarketerCampaignController } from './marketer-campaign.controller';
+import { MarketerCampaignService } from './marketer-campaign.service';
 
 @Module({
   imports: [AuthModule, PrismaModule, IdempotencyModule],
-  controllers: [CampaignPreviewController],
-  providers: [CampaignPreviewService, CampaignService],
+  controllers: [CampaignPreviewController, MarketerCampaignController],
+  providers: [CampaignPreviewService, CampaignService, MarketerCampaignService],
   exports: [CampaignService],
 })
 export class CampaignModule {}
