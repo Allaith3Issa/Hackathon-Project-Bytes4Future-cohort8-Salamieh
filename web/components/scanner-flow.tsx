@@ -2,10 +2,13 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { lookupOffer, redeemOffer, redeemVoucher } from "@/app/staff-actions";
-import { fieldClass, formatMoney, parseMoney, statusLabels } from "@/lib/staff-ui";
+import { fieldClass, formatMoney, parsePositiveMoney, statusLabels } from "@/lib/staff-ui";
 import type { OfferRedeemResult, ScannerLookup, VoucherRedeemResult } from "@/lib/staff-contract";
 import { Field } from "./field";
 import { useAttemptKey } from "./use-attempt-key";
+
+const PENDING = "mardood-pending-voucher";
+const remember = (value: unknown) => { try { value ? sessionStorage.setItem(PENDING, JSON.stringify(value)) : sessionStorage.removeItem(PENDING); } catch { /* ignore */ } };
 
 type Offer = Extract<ScannerLookup, { kind: "offer_qr" }>;
 type Voucher = Extract<ScannerLookup, { kind: "cashback_voucher" }>;
@@ -35,13 +38,26 @@ export function ScannerFlow() {
   const [phase, setPhase] = useState<Phase>({ step: "input" });
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
-  const [key, renewKey] = useAttemptKey();
+  const [key, renewKey, setKey] = useAttemptKey();
+  const [uncertain, setUncertain] = useState(false); 
   const heading = useRef<HTMLHeadingElement>(null);
   const alert = useRef<HTMLParagraphElement>(null);
   useEffect(() => { heading.current?.focus(); }, [phase.step]);
   useEffect(() => { if (error) alert.current?.focus(); }, [error]);
+ 
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(PENDING) ?? "null");
+      if (saved?.code && saved?.bill && saved?.key && saved?.voucher) {
+        setCode(saved.code); setBill(saved.bill); setKey(saved.key); setUncertain(true);
+        setPhase({ step: "voucher", voucher: saved.voucher });
+        setError("لم يصلنا تأكيد عملية استرداد سابقة. أعد المحاولة بنفس الفاتورة لنعرف نتيجتها.");
+      }
+    } catch {  }
+  }, [setKey]);
 
-  const reset = () => { setCode(""); setBill(""); setError(undefined); setPhase({ step: "input" }); renewKey(); };
+
+  const reset = () => { remember(null); setUncertain(false); setCode(""); setBill(""); setError(undefined); setPhase({ step: "input" }); renewKey(); };
   const lookup = () => start(async () => {
     setError(undefined);
     const r = await lookupOffer(code);
@@ -49,19 +65,21 @@ export function ScannerFlow() {
     renewKey();
     setPhase(r.lookup.kind === "offer_qr" ? { step: "offer", offer: r.lookup } : { step: "voucher", voucher: r.lookup });
   });
-  const redeem = (offer: Offer) => start(async () => {
+  const redeem = () => start(async () => {
     setError(undefined);
     const r = await redeemOffer(code, key);
     if (r.result) return setPhase({ step: "offer-done", result: r.result });
     setError(r.error);
     if (r.terminal) setPhase({ step: "input" });
   });
-  const redeemV = () => start(async () => {
+  const redeemV = (voucher: Voucher) => start(async () => {
     setError(undefined);
-    const r = await redeemVoucher(code, bill, key);
-    if (r.result) return setPhase({ step: "voucher-done", result: r.result });
+    const r = await redeemVoucher(code, bill, key); 
+    if (r.result) { remember(null); setUncertain(false); return setPhase({ step: "voucher-done", result: r.result }); }
     setError(r.error);
-    if (r.terminal) setPhase({ step: "input" });
+    if (r.outcome === "uncertain") { setUncertain(true); remember({ code, bill, key, voucher }); }
+    else if (r.outcome === "exceeds") { remember(null); setUncertain(false); renewKey(); } 
+    else if (r.outcome === "rejected") { remember(null); setUncertain(false); setPhase({ step: "input" }); }
   });
   const alertEl = error && <p ref={alert} tabIndex={-1} role="alert" className="notice-error">{error}</p>;
 
@@ -98,9 +116,9 @@ export function ScannerFlow() {
 
   if (phase.step === "voucher") {
     const v = phase.voucher;
-    const valid = parseMoney(bill) !== null;
+    const valid = parsePositiveMoney(bill) !== null;
     return (
-      <form className="surface grid gap-4 p-5 sm:p-6" aria-busy={pending} onSubmit={(e) => { e.preventDefault(); redeemV(); }}>
+      <form className="surface grid gap-4 p-5 sm:p-6" aria-busy={pending} onSubmit={(e) => { e.preventDefault(); redeemV(v); }}>
         <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">استرداد قسيمة كاش باك</h2>
         <p>الزبون: {v.customerName}</p>
         <div className="rounded-lg bg-mauve p-5">
@@ -108,15 +126,16 @@ export function ScannerFlow() {
           <p className="mt-2 text-3xl font-bold tabular-nums">{formatMoney(v.amountSyp)}</p>
         </div>
         <Field id={`${id}-bill`} label="إجمالي الفاتورة (ل.س.)" hint="الإجمالي بعد خصومات المتجر وقبل خصم القسيمة. مثال: 200.00">
-          <input id={`${id}-bill`} className={fieldClass} dir="ltr" inputMode="decimal" value={bill} autoComplete="off"
-            aria-invalid={Boolean(error)} aria-describedby={`${id}-bill-hint`}
-            onChange={(e) => { setBill(e.target.value); setError(undefined); renewKey(); }} />
+          <input id={`${id}-bill`} className={fieldClass} dir="ltr" inputMode="decimal" value={bill} autoComplete="off" readOnly={uncertain} aria-readonly={uncertain}
+            aria-invalid={Boolean(error) && !uncertain} aria-describedby={`${id}-bill-hint`}
+            onChange={(e) => { if (uncertain) return; setBill(e.target.value); setError(undefined); renewKey(); }} />
         </Field>
         <p className="text-sm text-muted">سيظهر المبلغ النقدي المستحق بعد التأكيد، محسوباً من الخادم. لا يمكن استرداد القسيمة نفسها مرتين.</p>
+        {uncertain && <p className="notice">الفاتورة مقفلة حتى نعرف نتيجة العملية. أعد المحاولة بنفس الفاتورة ولن تُسجَّل القسيمة مرتين.</p>}
         {alertEl}
         <div className="flex flex-wrap gap-3">
-          <button type="submit" className="button-primary" disabled={pending || !key || !valid}>{pending ? "جارٍ التأكيد…" : "تأكيد الاسترداد"}</button>
-          <button type="button" className="button-secondary" disabled={pending} onClick={reset}>إلغاء</button>
+          <button type="submit" className="button-primary" disabled={pending || !key || !valid}>{pending ? "جارٍ التأكيد…" : uncertain ? "إعادة المحاولة" : "تأكيد الاسترداد"}</button>
+          {!uncertain && <button type="button" className="button-secondary" disabled={pending} onClick={reset}>إلغاء</button>}
         </div>
       </form>
     );
@@ -136,7 +155,7 @@ export function ScannerFlow() {
         <p className="text-sm text-muted">استلم المبلغ نقداً قبل التأكيد. لا يمكن تأكيد الرمز نفسه مرتين.</p>
         {alertEl}
         <div className="flex flex-wrap gap-3">
-          <button type="button" className="button-primary" disabled={pending || !key} onClick={() => redeem(o)}>
+          <button type="button" className="button-primary" disabled={pending || !key} onClick={redeem}>
             {pending ? "جارٍ التأكيد…" : error ? "إعادة المحاولة" : "تأكيد استلام المبلغ"}
           </button>
           <button type="button" className="button-secondary" disabled={pending} onClick={reset}>إلغاء</button>

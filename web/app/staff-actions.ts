@@ -8,7 +8,7 @@ import { authenticatedRequest, saveSession } from "@/lib/session";
 import type {
   VoucherRedeemResult, AdminTopupResult, CampaignPreview, MerchantCampaign, OfferRedeemResult, ScannerLookup,
 } from "@/lib/staff-contract";
-import { parseMoney, staffError } from "@/lib/staff-ui";
+import { parseMoney, parsePercent, parsePositiveMoney, staffError } from "@/lib/staff-ui";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY_ERROR = "تعذّر تجهيز الطلب. حدّث الصفحة وحاول مرة أخرى.";
@@ -87,18 +87,17 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
   const price = parseMoney(text(data, "originalPriceSyp"));
   const commission = parseMoney(text(data, "commissionSyp"));
   const maxItems = /^[0-9]{1,10}$/.test(digits(text(data, "maxItems"))) ? Number(digits(text(data, "maxItems"))) : null;
-  const discountText = digits(text(data, "discountPercent"));
-  const discount = /^(100|[0-9]{1,2})(\.[0-9]{1,2})?$/.test(discountText) ? Number(discountText) : null;
+  const discount = parsePercent(text(data, "discountPercent"));
   const errors: Record<string, string> = {};
   if (!price) errors.originalPriceSyp = "أدخل سعراً صحيحاً أكبر من صفر.";
-  if (discount === null || discount > 100) errors.discountPercent = "أدخل نسبة من 0 إلى 100.";
+  if (discount === null) errors.discountPercent = "أدخل نسبة من 0 إلى 100.";
   if (commission === null) errors.commissionSyp = "أدخل عمولة صحيحة (يمكن أن تكون صفراً).";
   if (!maxItems || maxItems > 2147483647) errors.maxItems = "أدخل عدد قطع صحيحاً أكبر من صفر.";
   const productName = text(data, "productName");
   const description = text(data, "description");
   const imageUrl = text(data, "imageUrl");
   const endsRaw = text(data, "endsAt");
-  const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; 
+  const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; // Damascus is UTC+3
   if (launch) {
     if (!productName) errors.productName = "أدخل اسم المنتج.";
     if (!description) errors.description = "أدخل وصفاً للمنتج.";
@@ -122,7 +121,7 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
     redirect(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
   } catch (error) {
     if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error) };
-    throw error;
+    throw error; 
   }
 }
 
@@ -160,18 +159,22 @@ export async function redeemOffer(code: string, key: string): Promise<{ result?:
   }
 }
 
+export type VoucherOutcome = "uncertain" | "exceeds" | "rejected";
+
 export async function redeemVoucher(
   code: string, billTotal: string, key: string,
-): Promise<{ result?: VoucherRedeemResult; error?: string; terminal?: boolean }> {
-  const bill = parseMoney(billTotal);
-  if (!bill) return { error: "أدخل إجمالي الفاتورة بأرقام صحيحة، حتى منزلتين عشريتين." };
-  if (!uuid.test(key)) return { error: KEY_ERROR, terminal: true };
+): Promise<{ result?: VoucherRedeemResult; error?: string; outcome?: VoucherOutcome }> {
+  const bill = parsePositiveMoney(billTotal);
+  if (!bill) return { error: "أدخل إجمالي فاتورة أكبر من صفر، حتى منزلتين عشريتين." };
+  if (!uuid.test(key)) return { error: KEY_ERROR, outcome: "rejected" };
   try {
     return { result: await authenticatedRequest<VoucherRedeemResult>("/merchant/scanner/redeem-voucher", { method: "POST", idempotencyKey: key, body: { code: code.trim(), billTotalSyp: bill } }) };
   } catch (error) {
-    const uncertain = error instanceof ApiError && (error.status >= 500 || error.code === "RATE_LIMITED");
-
-    const keepOpen = error instanceof ApiError && error.code === "VOUCHER_EXCEEDS_BILL";
-    return { error: staffError(error), terminal: !uncertain && !keepOpen };
+    if (error instanceof ApiError) {
+     
+      if (error.status >= 500 || error.code === "RATE_LIMITED") return { error: staffError(error), outcome: "uncertain" };
+      if (error.code === "VOUCHER_EXCEEDS_BILL") return { error: staffError(error), outcome: "exceeds" };
+    }
+    return { error: staffError(error), outcome: "rejected" };
   }
 }
