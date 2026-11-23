@@ -20,4 +20,4 @@ Verify on the Android device that the marketer can sign in, join an open campaig
 
 After the core checkpoint, Esmaeel can build the screens against shared examples while the voucher extension is built on the web. Test the connections on a physical Android device once their APIs are ready. Keep the shared Arabic RTL design, IBM Plex Sans Arabic, and the same status language as the web.
 
-[Mobile ownership](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/tasks/03-mobile.md) · [Shared design](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/frontend/design.md) · [API contract](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/handoff/API_CONTRACT.md)
+[Mobile ownership](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/tasks/03-mobile.md) · [Shared design](../../web/design.md) · [API contract](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/handoff/API_CONTRACT.md)

@@ -78,7 +78,7 @@ type AuthSession = {
 };
 ```
 
-Web (`frontend/`) stores `accessToken` and `refreshToken` inside server-managed `HttpOnly` cookies via a Next.js session boundary. React Native (Expo) stores them in Secure Storage and sends `Authorization: Bearer <accessToken>`.
+Web (`web/`) stores `accessToken` and `refreshToken` inside server-managed `HttpOnly` cookies via a Next.js session boundary. React Native (Expo) stores them in Secure Storage and sends `Authorization: Bearer <accessToken>`.
 
 ## Campaigns and participation
 
