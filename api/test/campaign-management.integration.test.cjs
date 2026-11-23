@@ -4,6 +4,7 @@ const { randomBytes, randomUUID } = require('node:crypto');
 const { URL } = require('node:url');
 const bcrypt = require('bcrypt');
 
+const { AbortSignal } = globalThis;
 const databaseUrl = process.env.CAMPAIGN_MANAGEMENT_INTEGRATION_DATABASE_URL;
 
 test('Step 07 campaign management on isolated PostgreSQL', { skip: !databaseUrl, timeout: 30000 }, async (t) => {
