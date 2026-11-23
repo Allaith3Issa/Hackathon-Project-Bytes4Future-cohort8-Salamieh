@@ -3,6 +3,7 @@ import { ConflictException, Injectable, InternalServerErrorException, OnModuleIn
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { toMoneyJsonInteger } from '../common/money';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestWithAuth } from './authenticated-actor';
@@ -70,8 +71,8 @@ function mapAccount(record: AccountRecord): AccountDto {
     } : null,
     customer: customer ? {
       verifiedPurchaseCount: customer.verifiedPurchaseCount,
-      availableCashbackSyp: Number(customer.availableCashbackSyp),
-      lockedCashbackSyp: Number(customer.lockedCashbackSyp),
+      availableCashbackSyp: toMoneyJsonInteger(customer.availableCashbackSyp),
+      lockedCashbackSyp: toMoneyJsonInteger(customer.lockedCashbackSyp),
     } : null,
   };
 }

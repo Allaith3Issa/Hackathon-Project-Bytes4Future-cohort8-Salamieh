@@ -29,15 +29,15 @@ Use the [roadmap](HACKATHON_ROADMAP.md) for checkpoints and the [contract](API_C
 
 ## Backlog and first extension
 
-After the core demo is green, rehearse a voucher using the customer in the shared seed who is one purchase away from unlocking 5,000 SYP. Future work includes store-wide discounts, approval mode, camera scanning, merchant direct referrals, full marketer web, payout receipt workflows, leaderboards and broad reporting.
+After the core demo is green, rehearse a voucher using the customer in the shared seed who is one purchase away from unlocking 50.00 new SYP. Future work includes store-wide discounts, approval mode, camera scanning, merchant direct referrals, full marketer web, payout receipt workflows, leaderboards and broad reporting.
 
 ### Demo checks
 
 #### Live Android and web rehearsal
 
-1. Start with 100,000 SYP. Launch fails because the reserve is 435,000 SYP. Top up 400,000 SYP, launch, and verify 65,000 SYP available.
-2. Join and share from Expo. Open the link on the customer web flow, issue a pass, enter the code on the merchant web scanner, and confirm the 90,000 SYP sale. Verify commission 10,000, cashback 1,800, net platform fee 2,700 and reserve 420,500 SYP. Confirm the updated marketer balance in Expo and the cashback progress on the customer page.
-3. Close the campaign from merchant web and verify 485,500 SYP available and zero locked.
+1. Start with 1,000.00 new SYP. Launch fails because the reserve is 4,350.00 new SYP. Top up 4,000.00 new SYP, launch, and verify 650.00 new SYP available.
+2. Join and share from Expo. Open the link on the customer web flow, issue a pass, enter the code on the merchant web scanner, and confirm the 900.00 new SYP sale. Verify commission 100.00, cashback 18.00, net platform fee 27.00 and reserve 4,205.00 new SYP. Confirm the updated marketer balance in Expo and the cashback progress on the customer page.
+3. Close the campaign from merchant web and verify 4,855.00 new SYP available and zero locked.
 
 #### Backend integration tests
 
@@ -49,4 +49,4 @@ After the core demo is green, rehearse a voucher using the customer in the share
 
 #### Voucher extension
 
-9. In the live extension, redeem the customer's fifth qualifying Offer QR to unlock 5,000 SYP. Issue a 5,000 SYP voucher, redeem it at the second verified merchant on a 20,000 SYP bill, and show 15,000 SYP cash due and the merchant's 5,000 SYP credit. In an independent backend fixture, issue a 5,000 SYP voucher from 10,000 SYP available. Retry issuance with the same key and verify the same voucher and 5,000 SYP still available. Try a 3,000 SYP bill and verify the voucher stays active. Redeem against a 20,000 SYP bill and verify 15,000 SYP cash due and one 5,000 SYP credit to the second merchant. With a separate unused voucher, verify cancellation restores its reservation once.
+9. In the live extension, redeem the customer's fifth qualifying Offer QR to unlock 50.00 new SYP. Issue a 50.00 new SYP voucher, redeem it at the second verified merchant on a 200.00 new SYP bill, and show 150.00 new SYP cash due and the merchant's 50.00 new SYP credit. In an independent backend fixture, issue a 50.00 new SYP voucher from 100.00 new SYP available. Retry issuance with the same key and verify the same voucher and 50.00 new SYP still available. Try a 30.00 new SYP bill and verify the voucher stays active. Redeem against a 200.00 new SYP bill and verify 150.00 new SYP cash due and one 50.00 new SYP credit to the second merchant. With a separate unused voucher, verify cancellation restores its reservation once.

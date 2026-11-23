@@ -11,7 +11,7 @@ Start backlog implementation after the [live Android and web rehearsal and backe
 - **Laith Alhaj Husain** owns issuance, cancellation, and redemption. Reserve cashback once at issuance, release it on cancellation, and credit the redeeming merchant once. Keep the voucher active if the bill is smaller than its value.
 - **Allaith Issa** coordinates the voucher contract and demo seed with Laith. Publish the request and response examples so Alaa and Tayma can build in parallel, then help run the live rehearsal.
 
-**Acceptance check:** A customer issues a **5,000 SYP** voucher and a second verified merchant redeems it on a **20,000 SYP** bill. The API returns **15,000 SYP cash due** and one **5,000 SYP merchant credit**. Integration tests cover issuance retries, rejected redemption, duplicate redemption, and cancellation restoring the reservation once.
+**Acceptance check:** A customer issues a **50.00 new SYP** voucher and a second verified merchant redeems it on a **200.00 new SYP** bill. In minor units, the API returns `customerPaidCashSyp: 15000` and credits the merchant once for `5000` (50.00 new SYP). Integration tests cover issuance retries, rejected redemption, duplicate redemption, and cancellation restoring the reservation once.
 
 ## Allaith · Remaining tasks
 

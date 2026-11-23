@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { MAX_MONEY_MINOR_UNITS } from '../common/money';
 
 export const ACCESS_TOKEN_SECONDS = 900;
 const roles = ['admin', 'customer', 'marketer', 'merchant'] as const;
@@ -23,10 +24,12 @@ export class CustomerAccountDto {
   @ApiProperty({ type: 'integer', minimum: 0 })
   verifiedPurchaseCount!: number;
 
-  @ApiProperty({ type: 'integer', minimum: 0 })
+  @ApiProperty({ type: 'integer', minimum: 0, maximum: Number(MAX_MONEY_MINOR_UNITS),
+    description: 'Available cashback in integer hundredths of one new Syrian Pound (SYP).', example: 100000 })
   availableCashbackSyp!: number;
 
-  @ApiProperty({ type: 'integer', minimum: 0 })
+  @ApiProperty({ type: 'integer', minimum: 0, maximum: Number(MAX_MONEY_MINOR_UNITS),
+    description: 'Locked cashback in integer hundredths of one new Syrian Pound (SYP).', example: 1800 })
   lockedCashbackSyp!: number;
 }
 

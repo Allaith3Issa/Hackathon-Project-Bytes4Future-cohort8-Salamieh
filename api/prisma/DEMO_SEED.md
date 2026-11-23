@@ -25,21 +25,23 @@ This mode uses `DATABASE_URL`. The first run requires empty application tables. 
 
 ## Accounts and fixtures
 
+Seed amounts are integer hundredths of one new Syrian Pound. The numeric fixtures are unchanged since 100 old SYP equals one new SYP. The table shows amounts in new SYP with minor-unit integers in parentheses where useful.
+
 Account UUIDs use the prefix `aff111a7-e000-4000-8000-` and the 12-digit suffix below. Phones are synthetic fixture identifiers.
 
 | Scenario | Role | Phone | UUID suffix | Initial balance |
 | --- | --- | --- | --- | --- |
 | Live | Admin | `0999100001` | `000000000001` | No wallet |
-| Live | Verified merchant | `0999100002` | `000000000002` | 100,000 SYP available |
-| Live | Marketer | `0999100003` | `000000000003` | 0 SYP available |
-| Live | Customer | `0999100004` | `000000000004` | 0 SYP cashback |
-| Scanner | Verified merchant | `0999100005` | `000000000005` | 0 SYP available, 435,000 SYP reserved |
-| Scanner | Marketer | `0999100006` | `000000000006` | 0 SYP available |
-| Scanner | Customer | `0999100007` | `000000000007` | 0 SYP cashback |
+| Live | Verified merchant | `0999100002` | `000000000002` | 1,000.00 new SYP available (`100000`) |
+| Live | Marketer | `0999100003` | `000000000003` | 0.00 new SYP available |
+| Live | Customer | `0999100004` | `000000000004` | 0.00 new SYP cashback |
+| Scanner | Verified merchant | `0999100005` | `000000000005` | 0.00 new SYP available, 4,350.00 new SYP reserved (`435000`) |
+| Scanner | Marketer | `0999100006` | `000000000006` | 0.00 new SYP available |
+| Scanner | Customer | `0999100007` | `000000000007` | 0.00 new SYP cashback |
 
-The live merchant starts with no campaign. The scanner fixture has separate users, balances, campaign, membership, and pass. Both opening credits use the demo admin as the ledger actor. The scanner opening credit of 435,000 SYP is fully offset by the campaign reserve lock.
+The live merchant starts with no campaign. The scanner fixture has separate users, balances, campaign, membership, and pass. Both opening credits use the demo admin as the ledger actor. The scanner opening credit of 4,350.00 new SYP (`435000`) is fully offset by the campaign reserve lock.
 
-- Scanner campaign ID is `aff111a7-e000-4000-8000-000000000040`. Maamoul box costs 100,000 SYP before a 10% discount, or 90,000 SYP after discount. It is an active, open product campaign with a fixed 10,000 SYP commission, a 30-item cap, zero sales, and a 435,000 SYP locked reserve. It expires 30 days after the first seed run. The image URL is the contract’s sample placeholder.
+- Scanner campaign ID is `aff111a7-e000-4000-8000-000000000040`. Maamoul box costs 1,000.00 new SYP (`100000`) before a 10% discount, or 900.00 new SYP (`90000`) after discount. It is an active, open product campaign with a fixed 100.00 new SYP commission (`10000`), a 30-item cap, zero sales, and a 4,350.00 new SYP locked reserve (`435000`). It expires 30 days after the first seed run. The image URL is the contract’s sample placeholder.
 - Approved membership ID is `aff111a7-e000-4000-8000-000000000041`. The public referral path is `/r/mk-demo01` on the demo web origin.
 - The active Offer QR pass ID is `aff111a7-e000-4000-8000-000000000042`. Its human-readable code is `OF-DEMO01`. The token is generated on first run.
 
