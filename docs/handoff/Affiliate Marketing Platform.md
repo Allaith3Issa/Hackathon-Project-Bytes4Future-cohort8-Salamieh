@@ -74,7 +74,7 @@ Build a web application and an Android mobile application where:
 | **Hosting** | Verify the demo API and web URLs on Android on Day 1 |
 
 - Do not add paid third-party AI APIs or real credit-card payment gateways.
-- All monetary values are stored and calculated in **whole Syrian Pounds (SYP)** on the backend. The [API monetary limits](API_CONTRACT.md#monetary-limits-and-precision) govern input, calculation and response precision.
+- All monetary values are stored and calculated in **integer hundredths of one new Syrian Pound** on the backend. Human-facing amounts are displayed in new SYP. Existing `...Syp` fields remain JSON integers in minor units. The [API monetary limits](API_CONTRACT.md#monetary-limits-and-precision) govern input, calculation and response precision.
 
 ---
 
@@ -94,16 +94,16 @@ Build a web application and an Android mobile application where:
 
 ## 6. User Scenarios
 
-- **The merchant & prepaid reserve.** Abu Samer owns a sweets shop in Salamiyah. He registers as a merchant, signs the legal contract offline with the team, gets verified by Admin, and pays `500,000 SYP` via Sham Cash to top up his merchant wallet (`availableBalanceSyp = 500,000`). He creates a campaign: *"Maamoul box, 1 kg"*, price `100,000 SYP`, `10%` customer discount (`90,000 SYP` final), fixed marketer commission `10,000 SYP`, max `30` items. Worst-case reserve = `30 × (10,000 commission + 4,500 platform 5% fee) = 435,000 SYP`. Launching the campaign moves `435,000 SYP` from his available balance into the campaign's `lockedBudgetSyp`, leaving `65,000 SYP` available.
+- **The merchant & prepaid reserve.** Abu Samer owns a sweets shop in Salamiyah. He registers as a merchant, signs the legal contract offline with the team, gets verified by Admin, and pays `5,000.00 new SYP` via Sham Cash to top up his merchant wallet (`availableBalanceSyp = 500,000`). He creates a campaign: *"Maamoul box, 1 kg"*, price `1,000.00 new SYP`, `10%` customer discount (`900.00 new SYP` final), fixed marketer commission `100.00 new SYP`, max `30` items. Worst-case reserve = `30 × (100.00 commission + 45.00 platform 5% fee) = 4,350.00 new SYP`. Launching the campaign moves `4,350.00 new SYP` from his available balance into the campaign's `lockedBudgetSyp`, leaving `650.00 new SYP` available.
 - **Self-marketing vs marketer.** Abu Samer sets the campaign to `approval_required` and approves Rahaf (who gets her personal link). Abu Samer also copies his own **Merchant Direct Link** to post on his shop's Facebook page.
-- **In-store cash sale & QR scan.** Ali opens Rahaf's link (recording 1 click for Rahaf), signs in with his phone, and receives a single-use Offer QR. At the shop, Ali pays `90,000 SYP` **cash** to Abu Samer and asks him to scan his Offer QR so Ali gets his cashback progress. Abu Samer scans it once:
-  - `14,500 SYP` is deducted from `campaign.lockedBudgetSyp`:
-    - `10,000 SYP` credited immediately to Rahaf's marketer wallet.
-    - `4,500 SYP` (5% platform fee) split into `1,800 SYP` (2% of `90,000`) to Ali's locked cashback piggy-bank and `2,700 SYP` (3% of `90,000`) to Net Platform Fees.
+- **In-store cash sale & QR scan.** Ali opens Rahaf's link (recording 1 click for Rahaf), signs in with his phone, and receives a single-use Offer QR. At the shop, Ali pays `900.00 new SYP` **cash** to Abu Samer and asks him to scan his Offer QR so Ali gets his cashback progress. Abu Samer scans it once:
+  - `145.00 new SYP` is deducted from `campaign.lockedBudgetSyp`:
+    - `100.00 new SYP` credited immediately to Rahaf's marketer wallet.
+    - `45.00 new SYP` (5% platform fee) split into `18.00 new SYP` (2% of `900.00`) to Ali's locked cashback piggy-bank and `27.00 new SYP` (the platform fee minus cashback) to Net Platform Fees.
   - Ali's purchase counter increments by 1. Scanning the same QR again is rejected.
-- **Self-promoted sale.** Sara uses Abu Samer's direct link and buys 1 box for `90,000 SYP` cash. Only the 5% platform fee (`4,500 SYP`) is deducted from `lockedBudgetSyp` (`1,800 SYP` to Sara's cashback + `2,700 SYP` net platform fees). The unused `10,000 SYP` remains in the campaign budget and returns to Abu Samer if unused when the campaign ends.
-- **Customer cashback milestone & voucher redemption.** After 5 verified purchases totaling `250,000 SYP`, Ali's accumulated `5,000 SYP` locked cashback unlocks into `availableCashbackSyp`. Ali generates a `5,000 SYP` Cashback Voucher QR and uses it at a participating restaurant: he pays `5,000 SYP` less cash, and the platform credits `+5,000 SYP` back to the restaurant's merchant available balance.
-- **Marketer payout & Sham Cash receipt confirmation.** Rahaf opens the Expo Android app, sees `100,000 SYP` in her wallet (broken down by shop earnings), and taps **Request Payout** via Sham Cash. Admin sends `100,000 SYP`, uploads the dated Sham Cash transfer receipt photo, and marks it `transferred`. Rahaf sees the receipt photo in the app and taps **Confirm Receipt**.
+- **Self-promoted sale.** Sara uses Abu Samer's direct link and buys 1 box for `900.00 new SYP` cash. Only the 5% platform fee (`45.00 new SYP`) is deducted from `lockedBudgetSyp` (`18.00 new SYP` to Sara's cashback + `27.00 new SYP` net platform fees). The unused `100.00 new SYP` remains in the campaign budget and returns to Abu Samer if unused when the campaign ends.
+- **Customer cashback milestone & voucher redemption.** After 5 verified purchases totaling `2,500.00 new SYP`, Ali's accumulated `50.00 new SYP` locked cashback unlocks into `availableCashbackSyp`. Ali generates a `50.00 new SYP` Cashback Voucher QR and uses it at a participating restaurant: he pays `50.00 new SYP` less cash, and the platform credits `+50.00 new SYP` back to the restaurant's merchant available balance.
+- **Marketer payout & Sham Cash receipt confirmation.** Rahaf opens the Expo Android app, sees `1,000.00 new SYP` in her wallet (broken down by shop earnings), and taps **Request Payout** via Sham Cash. Admin sends `1,000.00 new SYP`, uploads the dated Sham Cash transfer receipt photo, and marks it `transferred`. Rahaf sees the receipt photo in the app and taps **Confirm Receipt**.
 
 ---
 
@@ -144,7 +144,7 @@ Build a web application and an Android mobile application where:
    - Cashback never exceeds the platform fee on the same recorded sale.
 5. **Cashback Milestone Unlock**:
    - Every verified scan adds `cashbackSyp` to `customer.lockedCashbackSyp` and increments `customer.milestonePurchaseCount` and `customer.milestoneSpendSyp`.
-   - When a milestone threshold is reached (**5 verified purchases** AND at least **50,000 SYP** cumulative spend in the current cycle), `lockedCashbackSyp` unlocks into `availableCashbackSyp` and the cycle resets cleanly for the next milestone.
+   - When a milestone threshold is reached (**5 verified purchases** AND at least **500.00 new SYP** cumulative spend in the current cycle), `lockedCashbackSyp` unlocks into `availableCashbackSyp` and the cycle resets cleanly for the next milestone.
 6. **Closed-Loop Cashback Redemption**:
    - Customers generate a single-use **Cashback Voucher QR** from `availableCashbackSyp` and present it at any verified participating merchant.
    - Issuing the voucher reserves its amount from `customer.availableCashbackSyp`. Cancellation restores that amount. Redemption consumes the reservation and credits the verified merchant's available balance once, in the same transaction. Active vouchers remain part of the Cashback Pool liability. The merchant enters the bill total before the voucher. A bill smaller than the voucher leaves it active. A valid redemption reduces cash due by the voucher amount. The extension uses standalone voucher checkout.
@@ -190,7 +190,7 @@ Build a web application and an Android mobile application where:
 
 ---
 
-## 9. Required Calculations (Whole SYP, Backend-Calculated)
+## 9. Required Calculations (Minor Units, Backend-Calculated)
 
 | Metric | Formula |
 | --- | --- |

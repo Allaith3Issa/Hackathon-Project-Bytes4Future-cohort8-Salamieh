@@ -169,6 +169,13 @@ test('Step 04A login HTTP contract', async (t) => {
     const response = await fetch(`${baseUrl}/api/docs-json`);
     assert.equal(response.status, 200);
     const document = await response.json();
+    const customer = document.components.schemas.CustomerAccountDto.properties;
+    for (const field of ['availableCashbackSyp', 'lockedCashbackSyp']) {
+      assert.equal(customer[field].type, 'integer');
+      assert.equal(customer[field].minimum, 0);
+      assert.equal(customer[field].maximum, Number.MAX_SAFE_INTEGER);
+      assert.match(customer[field].description, /hundredths of one new Syrian Pound/);
+    }
     for (const route of ['/api/v1/auth/login', '/api/v1/auth/admin/login']) {
       const operation = document.paths[route].post;
       assert.equal(operation.requestBody.content['application/json'].schema.$ref, '#/components/schemas/LoginDto');

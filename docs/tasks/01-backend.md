@@ -2,6 +2,8 @@
 
 NestJS and PostgreSQL · Allaith Issa and Laith Alhaj Husain
 
+All backend monetary amounts are integer hundredths of one new Syrian Pound. Use the [API monetary limits](../handoff/API_CONTRACT.md#monetary-limits-and-precision) for pricing, settlement, fixtures and client handoff. Existing `...Syp` fields retain their names and JSON integer types.
+
 ## Allaith Issa · API foundation, accounts and campaigns
 
 - **Start on Day 1.** Set up NestJS, PostgreSQL, migrations and Swagger. Publish the shared demo seed and API examples from `API_CONTRACT.md`, including a funded campaign and pre-issued pass so the scanner work can start in parallel.

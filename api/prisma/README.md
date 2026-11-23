@@ -2,7 +2,7 @@
 
 The Prisma schema preserves the [ERD](../../docs/handoff/DATABASE_ERD.md) names in PostgreSQL. User roles come from the customer, marketer, and admin flags and the presence of a merchant profile. A user can hold several roles at once. The wallet enum only covers the two roles with wallets.
 
-The ERD uses one numeric `commission_value` for whole-SYP fixed commissions and percentage values. Keep that column as exact decimal and enforce whole SYP for fixed commissions. Dedicated SYP columns use PostgreSQL `bigint`. The schema retains the ERD’s campaign and attribution variants. This step covers the 13 core models, with voucher and payout tables and their ledger links deferred.
+Dedicated monetary columns use PostgreSQL `bigint` and store integer hundredths of one new Syrian Pound. The exact decimal `commission_value` stores an integer minor-unit amount for fixed commissions and a percentage otherwise. The existing bounds, column names and Prisma mappings continue to apply. Verified old-SYP integers carry over unchanged. For any amount with uncertain historical denomination, check its source records and reconcile related balances and ledger entries before making a correction. The schema retains the ERD’s campaign and attribution variants. This step covers the 13 core models, with voucher and payout tables and their ledger links deferred.
 
 ## Active Offer QR uniqueness
 
