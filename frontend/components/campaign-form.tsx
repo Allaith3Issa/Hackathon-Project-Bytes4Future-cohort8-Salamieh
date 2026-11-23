@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useId, useRef, useState } from "react";
 import { campaignAction } from "@/app/staff-actions";
 import { formatSyp } from "@/lib/ui";
 import { fieldClass } from "@/lib/staff-ui";
@@ -20,13 +20,14 @@ export function CampaignForm() {
   const [state, submit, pending] = useActionState(campaignAction, {});
   const [key, renewKey] = useAttemptKey();
   const [v, setV] = useState<Values>(empty);
-  const [fresh, setFresh] = useState(false);
-  useEffect(() => { if (state.preview) setFresh(true); }, [state]);
-  const set = (name: keyof Values, value: string) => { setV((o) => ({ ...o, [name]: value })); setFresh(false); renewKey(); };
+  const set = (name: keyof Values, value: string) => {
+    setV((old) => ({ ...old, [name]: value }));
+    renewKey();
+  };
   const e = state.errors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
   useFocusError(formRef, state);
-  const p = fresh ? state.preview : undefined;
+  const p = state.preview?.key === key ? state.preview.values : undefined;
   const text = (name: keyof Values, label: string, extra: { numeric?: boolean; type?: string; hint?: string } = {}) => (
     <Field id={`${id}-${name}`} label={label} error={e[name]} hint={extra.hint}>
       <input id={`${id}-${name}`} name={name} value={v[name]} type={extra.type} className={fieldClass}
@@ -72,7 +73,7 @@ export function CampaignForm() {
         )}
         {state.error && <p role="alert" className="notice-error">{state.error}</p>}
         <div className="grid gap-3">
-          <button type="submit" name="intent" value="preview" className="button-secondary" disabled={pending}>حساب السعر والاحتياطي</button>
+          <button type="submit" name="intent" value="preview" className="button-secondary" disabled={pending || !key}>حساب السعر والاحتياطي</button>
           <button type="submit" name="intent" value="launch" className="button-primary" disabled={pending || !key || !p || !p.isAffordableByMerchant}>
             {pending ? "جارٍ المعالجة…" : state.error ? "إعادة محاولة الإطلاق" : "إطلاق الحملة"}
           </button>

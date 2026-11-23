@@ -12,6 +12,11 @@ import { useFocusError } from "./use-focus-error";
 const empty = { merchantId: "", amount: "", paymentMethod: "cash", note: "" };
 
 export function TopupForm({ merchants }: { merchants: AdminMerchant[] }) {
+  const [attempt, setAttempt] = useState("");
+  return <TopupAttempt key={attempt} merchants={merchants} onNewTopup={() => setAttempt(crypto.randomUUID())} />;
+}
+
+function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; onNewTopup: () => void }) {
   const id = useId();
   const [state, submit, pending] = useActionState(topUp, {});
   const [key, renewKey] = useAttemptKey();
@@ -46,7 +51,7 @@ export function TopupForm({ merchants }: { merchants: AdminMerchant[] }) {
             <dd className="mt-1 text-sm text-muted">{paymentLabels[r.paymentMethod]} · <bdi dir="ltr">{r.referenceNote}</bdi></dd>
           </div>
         </dl>
-        <button type="button" className="button-secondary mt-5" onClick={() => { setV(empty); setReview(false); renewKey(); }}>شحن جديد</button>
+        <button type="button" className="button-secondary mt-5" onClick={onNewTopup}>شحن جديد</button>
       </section>
     );
   }
