@@ -1,11 +1,12 @@
 import { applyDecorators, Body, Controller, Get, Header, Headers, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { requireRequestAuth, type RequestWithAuth } from './authenticated-actor';
 import { AccountDto, AuthErrorDto, AuthSessionDto } from './auth-session.dto';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginDto } from './login.dto';
 import { LoginThrottlerGuard } from './login-throttler.guard';
+import { RegisterDto } from './register.dto';
 import { LogoutDto, RefreshDto } from './session-token.dto';
 
 const ThrottleAuth = () => applyDecorators(
@@ -19,6 +20,17 @@ const ThrottleAuth = () => applyDecorators(
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  @Post('register')
+  @ThrottleAuth()
+  @Header('Cache-Control', 'no-store')
+  @ApiOperation({ summary: 'Register a public account and start a session' })
+  @ApiBody({ type: RegisterDto })
+  @ApiCreatedResponse({ type: AuthSessionDto })
+  @ApiResponse({ status: 409, type: AuthErrorDto, description: 'PHONE_ALREADY_REGISTERED' })
+  register(@Body() input: RegisterDto) {
+    return this.auth.register(input);
+  }
 
   @Get('me')
   @Header('Cache-Control', 'no-store')

@@ -1,13 +1,14 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { Injectable, InternalServerErrorException, OnModuleInit, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, InternalServerErrorException, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { RequestWithAuth } from './authenticated-actor';
 import { ACCESS_TOKEN_SECONDS, AccountDto, AuthSessionDto, Role } from './auth-session.dto';
 import { LoginDto } from './login.dto';
+import { RegisterDto } from './register.dto';
 
 const SESSION_INACTIVITY_MS = 30 * 24 * 60 * 60 * 1000;
 const BCRYPT_HASH = /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/;
@@ -132,23 +133,52 @@ export class AuthService implements OnModuleInit {
         });
       }
 
-      const sessionId = randomUUID();
-      const now = new Date();
-      const response = await this.issueSession(account, sessionId);
-      await client.userSession.create({
-        data: {
-          id: sessionId,
-          userId: account.id,
-          refreshTokenHash: hashRefreshToken(response.refreshToken),
-          lastActivityAt: now,
-          expiresAt: new Date(now.getTime() + SESSION_INACTIVITY_MS),
-          createdAt: now,
-        },
-        select: { id: true },
-      });
-      return response;
+      return await this.createSession(client, account);
     } catch (error) {
       return authFailure(error, 'Unable to sign in.');
+    }
+  }
+
+  async register(input: RegisterDto): Promise<AuthSessionDto> {
+    try {
+      const passwordHash = await bcrypt.hash(input.password, 10);
+      const isCustomer = input.roles.includes('customer');
+      const shop = input.roles.includes('merchant') ? input.shop : undefined;
+      const wallets = input.roles.filter((role) => role !== 'customer').map((role) => ({ role }));
+
+      return await this.prisma.getClient().$transaction(async (tx) => {
+        const account = await tx.user.create({
+          data: {
+            name: input.name,
+            phone: input.phone,
+            passwordHash,
+            isCustomer,
+            isMarketer: input.roles.includes('marketer'),
+            customerProfile: isCustomer ? { create: {} } : undefined,
+            merchantProfile: shop ? { create: { shopName: shop.name, shopDetails: shop.details } } : undefined,
+            wallets: wallets.length ? { create: wallets } : undefined,
+          },
+          include: accountRelations,
+          omit: { passwordHash: true },
+        });
+        return this.createSession(tx, account);
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const adapterError = error.meta?.driverAdapterError as {
+          cause?: { constraint?: { index?: string; fields?: string[] } };
+        } | undefined;
+        const constraint = adapterError?.cause?.constraint;
+        const target = constraint?.index ?? constraint?.fields ?? error.meta?.target;
+        if (target === 'users_phone_key' || (Array.isArray(target) && target.length === 1 && target[0] === 'phone')) {
+          throw new ConflictException({
+            statusCode: 409,
+            code: 'PHONE_ALREADY_REGISTERED',
+            message: 'This phone number is already registered.',
+          });
+        }
+      }
+      return authFailure(error, 'Unable to register the account.');
     }
   }
 
@@ -215,6 +245,24 @@ export class AuthService implements OnModuleInit {
     } catch (error) {
       return authFailure(error, 'Unable to sign out.');
     }
+  }
+
+  private async createSession(client: Prisma.TransactionClient, account: AccountRecord): Promise<AuthSessionDto> {
+    const sessionId = randomUUID();
+    const now = new Date();
+    const response = await this.issueSession(account, sessionId);
+    await client.userSession.create({
+      data: {
+        id: sessionId,
+        userId: account.id,
+        refreshTokenHash: hashRefreshToken(response.refreshToken),
+        lastActivityAt: now,
+        expiresAt: new Date(now.getTime() + SESSION_INACTIVITY_MS),
+        createdAt: now,
+      },
+      select: { id: true },
+    });
+    return response;
   }
 
   private async issueSession(account: AccountRecord, sessionId: string): Promise<AuthSessionDto> {
