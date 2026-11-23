@@ -17,6 +17,7 @@
     "db:check": "npm run build && node dist/prisma/check-connection.js",
     "predb:seed": "npm run build",
     "db:seed": "node --env-file-if-exists=.env dist/prisma/seed.js",
+    "admin:bootstrap": "node dist/admin/bootstrap-admin.js",
     "pretest": "npm run build",
     "test": "node --test test/*.test.cjs"
   },
