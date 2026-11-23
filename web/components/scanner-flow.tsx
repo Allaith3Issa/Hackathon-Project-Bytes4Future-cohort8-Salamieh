@@ -1,8 +1,9 @@
 "use client";
 
+import { useI18n } from "@/components/i18n-provider";
 import { useEffect, useId, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { lookupOffer, redeemOffer, redeemVoucher } from "@/app/staff-actions";
-import { fieldClass, formatMoney, parsePositiveMoney, statusLabels } from "@/lib/staff-ui";
+import { fieldClass, parsePositiveMoney, statusLabels } from "@/lib/staff-ui";
 import type { OfferRedeemResult, ScannerLookup, VoucherRedeemResult } from "@/lib/staff-contract";
 import { Field } from "./field";
 import { useAttemptKey } from "./use-attempt-key";
@@ -18,8 +19,8 @@ type Phase =
   | { step: "voucher-done"; result: VoucherRedeemResult };
 
 const subscribe = () => () => {};
-const restoredMessage = "لم يصلنا تأكيد عملية استرداد سابقة. أعد المحاولة بنفس الفاتورة لنعرف نتيجتها.";
-const storageError = "تعذّر حفظ محاولة الاسترداد. اسمح بتخزين بيانات الجلسة في المتصفح ثم حاول مرة أخرى.";
+const restoredMessage = "scanner.theLastRedemptionHasnTBeen";
+const storageError = "scanner.weCouldnTSaveTheRedemption";
 
 function readAttempt(storageKey: string): VoucherAttempt | null {
   try {
@@ -53,6 +54,7 @@ function clearAttempt(storageKey: string, key: string) {
 }
 
 function Rows({ rows }: { rows: [string, number][] }) {
+  const { formatSyp: formatMoney } = useI18n();
   return (
     <dl className="mt-4 divide-y divide-rule rounded-xl border border-rule">
       {rows.map(([l, n], i) => (
@@ -65,20 +67,22 @@ function Rows({ rows }: { rows: [string, number][] }) {
 }
 
 export function ScannerFlow({ merchantId }: { merchantId: string }) {
+  const { t } = useI18n();
   // The saved attempt is available only after hydration.
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
-  if (!hydrated) return <p role="status" className="notice">جارٍ تجهيز الماسح…</p>;
+  if (!hydrated) return <p role="status" className="notice">{t("scanner.preparingTheScanner")}</p>;
 
   return <Scanner storageKey={`mardood-pending-voucher:${merchantId}`} />;
 }
 
 function Scanner({ storageKey }: { storageKey: string }) {
+  const { t, formatSyp: formatMoney } = useI18n();
   const id = useId();
   const [attempt, setAttempt] = useState(() => readAttempt(storageKey));
   const [code, setCode] = useState(attempt?.code ?? "");
   const [bill, setBill] = useState(attempt?.bill ?? "");
   const [phase, setPhase] = useState<Phase>(attempt ? { step: "voucher", voucher: { amountSyp: attempt.amountSyp } } : { step: "input" });
-  const [error, setError] = useState<string | undefined>(attempt ? restoredMessage : undefined);
+  const [error, setError] = useState<string | undefined>(attempt ? t(restoredMessage) : undefined);
   const [pending, start] = useTransition();
   const [key, renewKey] = useAttemptKey();
   const voucherInFlight = useRef(false);
@@ -105,7 +109,7 @@ function Scanner({ storageKey }: { storageKey: string }) {
     if (voucherInFlight.current || pending || parsePositiveMoney(bill) === null) return;
     const submitted = attempt ?? { code: code.trim(), bill, key: crypto.randomUUID(), amountSyp: voucher.amountSyp };
     if (!attempt && !saveAttempt(storageKey, submitted)) {
-      setError(storageError);
+      setError(t(storageError));
       return;
     }
     voucherInFlight.current = true;
@@ -125,7 +129,7 @@ function Scanner({ storageKey }: { storageKey: string }) {
           if (r.outcome === "rejected") setPhase({ step: "input" });
         }
       } catch {
-        setError(restoredMessage);
+        setError(t(restoredMessage));
       } finally {
         voucherInFlight.current = false;
       }
@@ -137,14 +141,14 @@ function Scanner({ storageKey }: { storageKey: string }) {
     const r = phase.result;
     return (
       <section className="surface p-5 sm:p-6">
-        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">تم تسجيل البيع</h2>
-        <p role="status" className="mt-1 text-success">{r.productName} · حالة الحملة: {statusLabels[r.campaignStatusAfterSale]}</p>
+        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">{t("scanner.saleRecorded")}</h2>
+        <p role="status" className="mt-1 text-success">{r.productName}{" "}{t("scanner.campaignStatus")}{" "}{t(statusLabels[r.campaignStatusAfterSale])}</p>
         <Rows rows={[
-          ["استلمت من الزبون نقداً", r.customerPaidCashSyp], ["عمولة المسوّق", r.marketerCommissionSyp],
-          ["رسوم المنصة الإجمالية", r.platformTotalFeeSyp], ["كاش باك الزبون", r.customerCashbackSyp],
-          ["صافي رسوم المنصة", r.platformNetFeeSyp], ["الاحتياطي المتبقي للحملة", r.remainingLockedBudgetSyp],
+          [t("scanner.cashCollectedFromCustomer"), r.customerPaidCashSyp], [t("scanner.marketerCommission"), r.marketerCommissionSyp],
+          [t("scanner.grossPlatformFee"), r.platformTotalFeeSyp], [t("scanner.customerCashback"), r.customerCashbackSyp],
+          [t("scanner.netPlatformFee"), r.platformNetFeeSyp], [t("scanner.remainingCampaignReserve"), r.remainingLockedBudgetSyp],
         ]} />
-        <button type="button" className="button-primary mt-5" onClick={reset}>رمز جديد</button>
+        <button type="button" className="button-primary mt-5" onClick={reset}>{t("scanner.scanAnotherCode")}</button>
       </section>
     );
   }
@@ -153,13 +157,13 @@ function Scanner({ storageKey }: { storageKey: string }) {
     const r = phase.result;
     return (
       <section className="surface p-5 sm:p-6">
-        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">تم استرداد القسيمة</h2>
-        <p role="status" className="mt-1 text-success">استلم من الزبون المبلغ النقدي أدناه.</p>
+        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">{t("scanner.voucherRedeemed")}</h2>
+        <p role="status" className="mt-1 text-success">{t("scanner.collectTheCashAmountShownBelow")}</p>
         <Rows rows={[
-          ["المبلغ المستحق نقداً من الزبون", r.customerPaidCashSyp], ["إجمالي الفاتورة", r.billTotalSyp],
-          ["رصيد القسيمة المضاف لمتجرك", r.amountSyp], ["رصيدك المتاح الآن", r.merchantNewAvailableBalanceSyp],
+          [t("scanner.cashDueFromCustomer"), r.customerPaidCashSyp], [t("scanner.billTotal"), r.billTotalSyp],
+          [t("scanner.voucherCreditAddedToYourStore"), r.amountSyp], [t("scanner.yourAvailableBalanceNow"), r.merchantNewAvailableBalanceSyp],
         ]} />
-        <button type="button" className="button-primary mt-5" onClick={reset}>رمز جديد</button>
+        <button type="button" className="button-primary mt-5" onClick={reset}>{t("scanner.scanAnotherCode")}</button>
       </section>
     );
   }
@@ -170,13 +174,13 @@ function Scanner({ storageKey }: { storageKey: string }) {
     const locked = pending || attempt !== null;
     return (
       <form className="surface grid gap-4 p-5 sm:p-6" aria-busy={pending} onSubmit={(e) => { e.preventDefault(); redeemV(v); }}>
-        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">استرداد قسيمة كاش باك</h2>
-        {v.customerName && <p>الزبون: {v.customerName}</p>}
+        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">{t("scanner.redeemCashbackVoucher")}</h2>
+        {v.customerName && <p>{t("scanner.customer")}{" "}{v.customerName}</p>}
         <div className="rounded-lg bg-mauve p-5">
-          <p className="text-sm font-semibold">قيمة القسيمة</p>
+          <p className="text-sm font-semibold">{t("scanner.voucherValue")}</p>
           <p className="mt-2 text-3xl font-bold tabular-nums">{formatMoney(v.amountSyp)}</p>
         </div>
-        <Field id={`${id}-bill`} label="إجمالي الفاتورة (ل.س.)" hint="الإجمالي بعد خصومات المتجر وقبل خصم القسيمة. مثال: 200.00">
+        <Field id={`${id}-bill`} label={t("scanner.billTotalSyp")} hint={t("scanner.theTotalAfterStoreDiscountsAnd")}>
           <input id={`${id}-bill`} className={fieldClass} dir="ltr" inputMode="decimal" value={attempt?.bill ?? bill} autoComplete="off" readOnly={locked}
             aria-invalid={Boolean(error) && !locked} aria-describedby={`${id}-bill-hint`}
             onChange={(e) => {
@@ -185,12 +189,12 @@ function Scanner({ storageKey }: { storageKey: string }) {
               setError(undefined);
             }} />
         </Field>
-        <p className="text-sm text-muted">سيظهر المبلغ النقدي المستحق بعد التأكيد، محسوباً من الخادم. لا يمكن استرداد القسيمة نفسها مرتين.</p>
-        {attempt && !pending && <p className="notice">الفاتورة مقفلة حتى نعرف نتيجة العملية. أعد المحاولة بنفس الفاتورة ولن تُسجَّل القسيمة مرتين.</p>}
+        <p className="text-sm text-muted">{t("scanner.theServerCalculatesTheCashDue")}</p>
+        {attempt && !pending && <p className="notice">{t("scanner.theBillIsLockedWhileThe")}</p>}
         {alertEl}
         <div className="flex flex-wrap gap-3">
-          <button type="submit" className="button-primary" disabled={pending || !valid}>{pending ? "جارٍ التأكيد…" : attempt ? "إعادة المحاولة" : "تأكيد الاسترداد"}</button>
-          {!locked && <button type="button" className="button-secondary" onClick={reset}>إلغاء</button>}
+          <button type="submit" className="button-primary" disabled={pending || !valid}>{pending ? t("scanner.confirming") : attempt ? t("common.tryAgain") : t("scanner.confirmRedemption")}</button>
+          {!locked && <button type="button" className="button-secondary" onClick={reset}>{t("common.cancel")}</button>}
         </div>
       </form>
     );
@@ -201,19 +205,19 @@ function Scanner({ storageKey }: { storageKey: string }) {
     const due = o.availableQuantityOptions.find((q) => q.quantity === 1)?.customerPaidCashSyp ?? o.finalPriceSyp;
     return (
       <section className="surface grid gap-4 p-5 sm:p-6">
-        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">تأكيد البيع</h2>
-        <p>{o.productName} · الزبون: {o.customerName}</p>
+        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">{t("scanner.confirmSale")}</h2>
+        <p>{o.productName}{" "}{t("scanner.customer2")}{" "}{o.customerName}</p>
         <div className="rounded-lg bg-ink p-5 text-white">
-          <p className="text-sm font-semibold">المبلغ المستحق نقداً من الزبون</p>
+          <p className="text-sm font-semibold">{t("scanner.cashDueFromCustomer")}</p>
           <p className="mt-2 text-3xl font-bold tabular-nums">{due === null ? "—" : formatMoney(due)}</p>
         </div>
-        <p className="text-sm text-muted">استلم المبلغ نقداً قبل التأكيد. لا يمكن تأكيد الرمز نفسه مرتين.</p>
+        <p className="text-sm text-muted">{t("scanner.collectTheCashBeforeConfirmingEach")}</p>
         {alertEl}
         <div className="flex flex-wrap gap-3">
           <button type="button" className="button-primary" disabled={pending || !key} onClick={redeem}>
-            {pending ? "جارٍ التأكيد…" : error ? "إعادة المحاولة" : "تأكيد استلام المبلغ"}
+            {pending ? t("scanner.confirming") : error ? t("common.tryAgain") : t("scanner.confirmCashReceived")}
           </button>
-          <button type="button" className="button-secondary" disabled={pending} onClick={reset}>إلغاء</button>
+          <button type="button" className="button-secondary" disabled={pending} onClick={reset}>{t("common.cancel")}</button>
         </div>
       </section>
     );
@@ -221,13 +225,13 @@ function Scanner({ storageKey }: { storageKey: string }) {
 
   return (
     <form className="surface grid gap-4 p-5 sm:p-6" aria-busy={pending} onSubmit={(e) => { e.preventDefault(); lookup(); }}>
-      <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">أدخل رمز بطاقة الخصم أو القسيمة</h2>
-      <Field id={id} label="الرمز" hint="الرمز المكتوب تحت الـ QR على هاتف الزبون.">
+      <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">{t("scanner.enterADiscountPassOrVoucher")}</h2>
+      <Field id={id} label={t("scanner.code")} hint={t("scanner.enterTheCodeBelowTheQr")}>
         <input id={id} className={fieldClass} dir="ltr" autoComplete="off" autoCapitalize="characters" value={code}
           aria-describedby={`${id}-hint`} onChange={(e) => setCode(e.target.value)} />
       </Field>
       {alertEl}
-      <button type="submit" className="button-primary" disabled={pending || !code.trim()}>{pending ? "جارٍ البحث…" : "بحث"}</button>
+      <button type="submit" className="button-primary" disabled={pending || !code.trim()}>{pending ? t("scanner.searching") : t("scanner.search")}</button>
     </form>
   );
 }
