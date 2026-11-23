@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useId, useRef, useState } from "react";
 import { topUp } from "@/app/staff-actions";
 import { fieldClass, paymentLabels, formatMoney, parseMoney } from "@/lib/staff-ui";
 import type { AdminMerchant, PaymentMethod } from "@/lib/staff-contract";
@@ -20,7 +20,9 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
   const [state, submit, pending] = useActionState(topUp, {});
   const [key, renewKey] = useAttemptKey();
   const [v, setV] = useState(empty);
-  const [review, setReview] = useState(false);
+  const [reviewAt, setReviewAt] = useState<{ errors: typeof state.errors } | null>(null);
+  
+  const review = reviewAt !== null && reviewAt.errors === state.errors;
   const [local, setLocal] = useState<Record<string, string>>({});
   const errors = { ...state.errors, ...local };
   const formRef = useRef<HTMLFormElement>(null);
@@ -32,7 +34,6 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
     setLocal({});
     renewKey(); 
   };
-  useEffect(() => { if (state.errors) setReview(false); }, [state]);
 
   if (state.result) {
     const r = state.result;
@@ -61,7 +62,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
     if (!parseMoney(v.amount) ) found.amount = "أدخل مبلغاً صحيحاً أكبر من صفر (حتى منزلتين عشريتين).";
     if (!v.note.trim()) found.note = "أدخل مرجع الدفع.";
     setLocal(found);
-    if (!Object.keys(found).length) setReview(true);
+    if (!Object.keys(found).length) setReviewAt({ errors: state.errors });
   };
 
   return (
@@ -79,7 +80,7 @@ function TopupAttempt({ merchants, onNewTopup }: { merchants: AdminMerchant[]; o
           {state.error && <p role="alert" className="notice-error">{state.error}</p>}
           <div className="flex flex-wrap gap-3">
             <button type="submit" className="button-primary" disabled={pending || !key}>{pending ? "جارٍ الشحن…" : state.error ? "إعادة المحاولة" : "تأكيد الشحن"}</button>
-            <button type="button" className="button-secondary" disabled={pending} onClick={() => setReview(false)}>تعديل</button>
+            <button type="button" className="button-secondary" disabled={pending} onClick={() => setReviewAt(null)}>تعديل</button>
           </div>
         </>
       ) : (
