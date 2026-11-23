@@ -75,6 +75,7 @@ erDiagram
         uuid merchant_id FK
         uuid admin_id FK
         bigint amount_syp
+        bigint merchant_new_available_balance_syp "nullable only for unverifiable legacy snapshots"
         enum payment_method "cash, sham_cash, syriatel_cash, bank_transfer"
         text reference_note
         timestamptz created_at
