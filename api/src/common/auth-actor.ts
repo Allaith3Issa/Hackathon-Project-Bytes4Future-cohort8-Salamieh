@@ -69,3 +69,8 @@ export const CurrentActor = createParamDecorator(
     context.switchToHttp().getRequest<RequestWithActor>().user!,
 );
 
+export const OptionalCurrentActor = createParamDecorator(
+  (_data: unknown, context: ExecutionContext): AuthenticatedActor | undefined =>
+    context.switchToHttp().getRequest<RequestWithActor>().user,
+);
+

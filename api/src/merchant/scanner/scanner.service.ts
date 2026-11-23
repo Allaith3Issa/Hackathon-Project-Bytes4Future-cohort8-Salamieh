@@ -5,13 +5,20 @@ import { AuthenticatedActor } from '../../common/auth-actor';
 import { apiError } from '../../common/api-error';
 import { IdempotencyService } from '../../common/idempotency.service';
 import {
+  calculateStoreDiscountAmounts,
   calculateOfferAmounts,
   parseSyp,
   sypNumber,
 } from '../../common/money';
 import { DatabaseService } from '../../database/database.service';
 import { CampaignClosureService } from '../../campaign/campaign-closure.service';
-import { RedeemOfferDto, ScannerLookupDto } from './scanner.dto';
+import { CashbackVoucherService } from '../../financial/cashback-voucher.service';
+import {
+  PreviewOfferDto,
+  RedeemOfferDto,
+  RedeemVoucherDto,
+  ScannerLookupDto,
+} from './scanner.dto';
 
 type CampaignStatus = 'active' | 'ended';
 type OfferLookup = {
@@ -49,11 +56,12 @@ type CampaignRow = {
   merchant_id: string;
   campaign_type: string;
   product_name: string;
-  original_price_syp: string;
+  original_price_syp: string | null;
   discount_percent: string;
   commission_type: string;
   commission_value: string;
-  max_items: number;
+  max_items: number | null;
+  max_sales_volume_syp: string | null;
   locked_budget_syp: string;
   status: CampaignStatus;
   ends_at: Date;
@@ -66,19 +74,22 @@ export class ScannerService {
     private readonly database: DatabaseService,
     private readonly idempotency: IdempotencyService,
     private readonly campaignClosure: CampaignClosureService,
+    private readonly vouchers: CashbackVoucherService,
   ) {}
 
   async lookup(
     actor: AuthenticatedActor,
     input: ScannerLookupDto,
-  ): Promise<OfferLookup> {
+  ): Promise<
+    OfferLookup | Awaited<ReturnType<CashbackVoucherService['lookupForMerchant']>>
+  > {
     const result = await this.database.query<{
       pass_id: string;
       campaign_id: string;
       campaign_type: string;
       product_name: string;
       customer_name: string;
-      original_price_syp: string;
+      original_price_syp: string | null;
       discount_percent: string;
       status: string;
       ends_at: Date;
@@ -101,9 +112,7 @@ export class ScannerService {
       [input.code, actor.id],
     );
     const pass = result.rows[0];
-    if (!pass) {
-      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Code not found.');
-    }
+    if (!pass) return this.vouchers.lookupForMerchant(actor, input.code);
     if (pass.verification_status !== 'verified') {
       throw apiError(
         HttpStatus.FORBIDDEN,
@@ -120,15 +129,35 @@ export class ScannerService {
           : 'This Offer QR has already been redeemed.',
       );
     }
-    if (!pass.original_price_syp || !pass.product_name) {
-      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Code not found.');
-    }
     if (pass.ends_at.getTime() <= Date.now() || pass.campaign_status !== 'active') {
       throw apiError(
         HttpStatus.CONFLICT,
         'CAMPAIGN_ENDED',
         'This campaign is no longer available.',
       );
+    }
+
+    if (pass.campaign_type === 'store_discount') {
+      return {
+        kind: 'offer_qr',
+        passId: pass.pass_id,
+        campaignId: pass.campaign_id,
+        campaignType: 'store_discount',
+        productName: pass.product_name,
+        customerName: pass.customer_name,
+        discountPercent: Number(pass.discount_percent),
+        finalPriceSyp: null,
+        maxQuantity: null,
+        availableQuantityOptions: [],
+        status: 'active',
+      };
+    }
+    if (
+      pass.campaign_type !== 'product' ||
+      !pass.original_price_syp ||
+      !pass.product_name
+    ) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Code not found.');
     }
 
     const finalPrice = calculateOfferAmounts({
@@ -154,19 +183,136 @@ export class ScannerService {
     };
   }
 
+  async previewStoreDiscount(
+    actor: AuthenticatedActor,
+    input: PreviewOfferDto,
+  ) {
+    const reference = await this.database.query<{
+      pass_id: string;
+      campaign_id: string;
+      campaign_type: string;
+      merchant_id: string;
+      verification_status: string;
+      campaign_status: CampaignStatus;
+      ends_at: Date;
+      pass_status: string;
+      campaign_marketer_id: string | null;
+      product_name: string;
+      discount_percent: string;
+      commission_type: string;
+      commission_value: string;
+      max_sales_volume_syp: string | null;
+      locked_budget_syp: string;
+    }>(
+      `SELECT p.id AS pass_id, p.status AS pass_status,
+              p.campaign_marketer_id, c.id AS campaign_id, c.campaign_type,
+              c.merchant_id, mp.verification_status, c.status AS campaign_status,
+              c.ends_at, c.product_name, c.discount_percent::text,
+              c.commission_type, c.commission_value::text,
+              c.max_sales_volume_syp::text, c.locked_budget_syp::text
+       FROM offer_qr_passes p
+       JOIN campaigns c ON c.id = p.campaign_id
+       JOIN merchant_profiles mp ON mp.user_id = c.merchant_id
+       WHERE (p.qr_token = $1 OR p.pass_code = $1)
+         AND c.merchant_id = $2
+       LIMIT 1`,
+      [input.code, actor.id],
+    );
+    const campaign = reference.rows[0];
+    if (!campaign) {
+      throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Code not found.');
+    }
+    if (campaign.verification_status !== 'verified') {
+      throw apiError(
+        HttpStatus.FORBIDDEN,
+        'MERCHANT_NOT_VERIFIED',
+        'Only verified merchants can preview store-discount checkouts.',
+      );
+    }
+    if (campaign.campaign_type !== 'store_discount') {
+      throw apiError(
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        'The Offer QR is not for a store-discount campaign.',
+      );
+    }
+    this.assertPassAndCampaignActive(
+      campaign.pass_status,
+      campaign.campaign_status,
+      campaign.ends_at,
+    );
+    if (campaign.commission_type !== 'percentage') {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'AMOUNT_OUT_OF_RANGE',
+        'The store-discount commission configuration is invalid.',
+      );
+    }
+
+    const amounts = calculateStoreDiscountAmounts({
+      originalBillSyp: input.originalBillSyp,
+      discountPercent: campaign.discount_percent,
+      commissionPercent: campaign.campaign_marketer_id
+        ? campaign.commission_value
+        : '0',
+    });
+    if (
+      amounts.customerPaidCashSyp <= 0n ||
+      amounts.totalDeductedReserveSyp >= amounts.customerPaidCashSyp
+    ) {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'AMOUNT_OUT_OF_RANGE',
+        'The campaign pricing configuration is invalid.',
+      );
+    }
+    const volume = await this.database.query<{
+      sold_volume_syp: string;
+    }>(
+      `SELECT COALESCE(SUM(customer_paid_cash_syp), 0)::text AS sold_volume_syp
+       FROM sales
+       WHERE campaign_id = $1`,
+      [campaign.campaign_id],
+    );
+    const soldVolume = parseSyp(volume.rows[0]?.sold_volume_syp ?? '0');
+    const cap = campaign.max_sales_volume_syp
+      ? parseSyp(campaign.max_sales_volume_syp)
+      : 0n;
+    if (cap === 0n || soldVolume + amounts.customerPaidCashSyp > cap) {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'CAMPAIGN_LIMIT_EXCEEDED',
+        'This checkout would exceed the campaign sales-volume limit.',
+      );
+    }
+    if (
+      parseSyp(campaign.locked_budget_syp) <
+      amounts.totalDeductedReserveSyp
+    ) {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_LOCKED_BUDGET',
+        'The campaign reserve cannot cover this checkout.',
+      );
+    }
+
+    return {
+      customerPaidCashSyp: sypNumber(amounts.customerPaidCashSyp),
+      marketerCommissionSyp: sypNumber(amounts.marketerCommissionSyp),
+      platformTotalFeeSyp: sypNumber(amounts.platformTotalFeeSyp),
+      customerCashbackSyp: sypNumber(amounts.customerCashbackSyp),
+      platformNetFeeSyp: sypNumber(amounts.platformNetFeeSyp),
+      totalDeductedReserveSyp: sypNumber(
+        amounts.totalDeductedReserveSyp,
+      ),
+    };
+  }
+
   async redeemOffer(
     actor: AuthenticatedActor,
     requestKey: string,
     input: RedeemOfferDto,
   ): Promise<OfferRedeemResult> {
-    if (input.originalBillSyp !== undefined || (input.quantity ?? 1) !== 1) {
-      throw apiError(
-        HttpStatus.BAD_REQUEST,
-        'VALIDATION_ERROR',
-        'Demo Offer QR redemption accepts one product item and no bill total.',
-      );
-    }
-
     return this.database.transaction(async (client) => {
       const replay = await this.idempotency.execute<OfferRedeemResult>(
         client,
@@ -174,22 +320,40 @@ export class ScannerService {
           actorId: actor.id,
           operation: 'merchant.offer_redeem',
           requestKey,
-          fingerprintValue: { code: input.code, quantity: 1 },
+          fingerprintValue: {
+            code: input.code,
+            quantity: input.quantity ?? 1,
+            originalBillSyp: input.originalBillSyp ?? null,
+          },
         },
         async () => ({
           statusCode: HttpStatus.CREATED,
-          body: await this.settleOffer(client, actor, input.code),
+          body: await this.settleOffer(client, actor, input),
         }),
       );
       return replay.body;
     });
   }
 
+  async redeemVoucher(
+    actor: AuthenticatedActor,
+    requestKey: string,
+    input: RedeemVoucherDto,
+  ) {
+    return this.vouchers.redeemForMerchant(
+      actor,
+      requestKey,
+      input.code,
+      input.billTotalSyp,
+    );
+  }
+
   private async settleOffer(
     client: PoolClient,
     actor: AuthenticatedActor,
-    code: string,
+    input: RedeemOfferDto,
   ): Promise<OfferRedeemResult> {
+    const { code } = input;
     const reference = await client.query<{ campaign_id: string }>(
       `SELECT campaign_id FROM offer_qr_passes
        WHERE qr_token = $1 OR pass_code = $1
@@ -205,6 +369,7 @@ export class ScannerService {
       `SELECT c.id, c.merchant_id, c.campaign_type, c.product_name,
               c.original_price_syp::text, c.discount_percent::text,
               c.commission_type, c.commission_value::text, c.max_items,
+              c.max_sales_volume_syp::text,
               c.locked_budget_syp::text, c.status, c.ends_at,
               mp.verification_status
        FROM campaigns c
@@ -224,7 +389,10 @@ export class ScannerService {
         'Only verified merchants can redeem Offer QRs.',
       );
     }
-    if (campaign.campaign_type !== 'product') {
+    if (
+      campaign.campaign_type !== 'product' &&
+      campaign.campaign_type !== 'store_discount'
+    ) {
       throw apiError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Code not found.');
     }
 
@@ -257,45 +425,124 @@ export class ScannerService {
           : 'This Offer QR has already been redeemed.',
       );
     }
-    if (campaign.status !== 'active' || campaign.ends_at.getTime() <= Date.now()) {
-      throw apiError(
-        HttpStatus.CONFLICT,
-        'CAMPAIGN_ENDED',
-        'This campaign is no longer available.',
-      );
-    }
-
-    const amounts = calculateOfferAmounts({
-      originalPriceSyp: campaign.original_price_syp,
-      discountPercent: campaign.discount_percent,
-      fixedCommissionSyp: pass.campaign_marketer_id
-        ? campaign.commission_value
-        : 0,
-    });
-    if (
-      campaign.commission_type !== 'fixed' ||
-      amounts.marketerCommissionSyp + amounts.platformTotalFeeSyp >=
-        amounts.customerPaidCashSyp
-    ) {
-      throw apiError(
-        HttpStatus.CONFLICT,
-        'AMOUNT_OUT_OF_RANGE',
-        'The campaign pricing configuration is invalid.',
-      );
-    }
-
-    const sales = await client.query<{ sold_items: string }>(
-      `SELECT COALESCE(SUM(quantity), 0)::text AS sold_items
-       FROM sales WHERE campaign_id = $1`,
-      [campaign.id],
+    this.assertPassAndCampaignActive(
+      pass.pass_status,
+      campaign.status,
+      campaign.ends_at,
     );
-    const soldItems = BigInt(sales.rows[0].sold_items);
-    if (soldItems >= BigInt(campaign.max_items)) {
+    if ((input.quantity ?? 1) !== 1) {
       throw apiError(
-        HttpStatus.CONFLICT,
-        'CAMPAIGN_ENDED',
-        'This campaign has reached its sale limit.',
+        HttpStatus.BAD_REQUEST,
+        'VALIDATION_ERROR',
+        'Offer QR redemption accepts one item or bill per scan.',
       );
+    }
+
+    let amounts: ReturnType<typeof calculateOfferAmounts>;
+    let closesAtCap: boolean;
+    if (campaign.campaign_type === 'product') {
+      if (input.originalBillSyp !== undefined) {
+        throw apiError(
+          HttpStatus.BAD_REQUEST,
+          'VALIDATION_ERROR',
+          'A product Offer QR does not accept a bill total.',
+        );
+      }
+      if (
+        campaign.commission_type !== 'fixed' ||
+        campaign.original_price_syp === null ||
+        campaign.max_items === null
+      ) {
+        throw apiError(
+          HttpStatus.CONFLICT,
+          'AMOUNT_OUT_OF_RANGE',
+          'The product campaign pricing configuration is invalid.',
+        );
+      }
+      amounts = calculateOfferAmounts({
+        originalPriceSyp: campaign.original_price_syp,
+        discountPercent: campaign.discount_percent,
+        fixedCommissionSyp: pass.campaign_marketer_id
+          ? campaign.commission_value
+          : 0,
+      });
+      if (
+        amounts.marketerCommissionSyp + amounts.platformTotalFeeSyp >=
+        amounts.customerPaidCashSyp
+      ) {
+        throw apiError(
+          HttpStatus.CONFLICT,
+          'AMOUNT_OUT_OF_RANGE',
+          'The campaign pricing configuration is invalid.',
+        );
+      }
+      const sales = await client.query<{ sold_items: string }>(
+        `SELECT COALESCE(SUM(quantity), 0)::text AS sold_items
+         FROM sales WHERE campaign_id = $1`,
+        [campaign.id],
+      );
+      const soldItems = BigInt(sales.rows[0]?.sold_items ?? '0');
+      if (soldItems >= BigInt(campaign.max_items)) {
+        throw apiError(
+          HttpStatus.CONFLICT,
+          'CAMPAIGN_ENDED',
+          'This campaign has reached its sale limit.',
+        );
+      }
+      closesAtCap = soldItems + 1n >= BigInt(campaign.max_items);
+    } else {
+      if (input.originalBillSyp === undefined) {
+        throw apiError(
+          HttpStatus.BAD_REQUEST,
+          'VALIDATION_ERROR',
+          'A bill total is required for a store-discount Offer QR.',
+        );
+      }
+      if (
+        campaign.commission_type !== 'percentage' ||
+        campaign.max_sales_volume_syp === null
+      ) {
+        throw apiError(
+          HttpStatus.CONFLICT,
+          'AMOUNT_OUT_OF_RANGE',
+          'The store-discount campaign configuration is invalid.',
+        );
+      }
+      amounts = calculateStoreDiscountAmounts({
+        originalBillSyp: input.originalBillSyp,
+        discountPercent: campaign.discount_percent,
+        commissionPercent: pass.campaign_marketer_id
+          ? campaign.commission_value
+          : '0',
+      });
+      if (
+        amounts.customerPaidCashSyp <= 0n ||
+        amounts.totalDeductedReserveSyp >= amounts.customerPaidCashSyp
+      ) {
+        throw apiError(
+          HttpStatus.CONFLICT,
+          'AMOUNT_OUT_OF_RANGE',
+          'The campaign pricing configuration is invalid.',
+        );
+      }
+      const sales = await client.query<{ sold_volume_syp: string }>(
+        `SELECT COALESCE(SUM(customer_paid_cash_syp), 0)::text AS sold_volume_syp
+         FROM sales WHERE campaign_id = $1`,
+        [campaign.id],
+      );
+      const soldVolume = parseSyp(sales.rows[0]?.sold_volume_syp ?? '0');
+      const cap = parseSyp(campaign.max_sales_volume_syp);
+      if (
+        soldVolume >= cap ||
+        soldVolume + amounts.customerPaidCashSyp > cap
+      ) {
+        throw apiError(
+          HttpStatus.CONFLICT,
+          'CAMPAIGN_LIMIT_EXCEEDED',
+          'This checkout would exceed the campaign sales-volume limit.',
+        );
+      }
+      closesAtCap = soldVolume + amounts.customerPaidCashSyp >= cap;
     }
 
     const existingLockedBudget = parseSyp(campaign.locked_budget_syp);
@@ -308,8 +555,6 @@ export class ScannerService {
     }
     const remainingBeforeClose =
       existingLockedBudget - amounts.totalDeductedReserveSyp;
-    const closesAtCap = soldItems + 1n >= BigInt(campaign.max_items);
-
     const walletUsers = [actor.id];
     if (pass.marketer_id) walletUsers.push(pass.marketer_id);
     const walletResult = await client.query<{
@@ -510,5 +755,28 @@ export class ScannerService {
       campaignStatusAfterSale: closesAtCap ? 'ended' : 'active',
       scannedAt: scannedAt.toISOString(),
     };
+  }
+
+  private assertPassAndCampaignActive(
+    passStatus: string,
+    campaignStatus: CampaignStatus,
+    endsAt: Date,
+  ): void {
+    if (passStatus !== 'active') {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        passStatus === 'expired' ? 'QR_EXPIRED' : 'QR_ALREADY_REDEEMED',
+        passStatus === 'expired'
+          ? 'This Offer QR has expired.'
+          : 'This Offer QR has already been redeemed.',
+      );
+    }
+    if (campaignStatus !== 'active' || endsAt.getTime() <= Date.now()) {
+      throw apiError(
+        HttpStatus.CONFLICT,
+        'CAMPAIGN_ENDED',
+        'This campaign is no longer available.',
+      );
+    }
   }
 }

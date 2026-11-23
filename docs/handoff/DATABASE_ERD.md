@@ -26,6 +26,7 @@ erDiagram
     CUSTOMER_PROFILES ||..o{ CASHBACK_VOUCHERS : "redeems unlocked cashback"
     MERCHANT_PROFILES |o..o{ CASHBACK_VOUCHERS : "redeems voucher in store"
     WALLETS ||..o{ PAYOUT_REQUESTS : "requests withdrawals"
+    PAYOUT_REQUESTS ||--o| PAYOUT_RECEIPT_FILES : "stores private transfer proof"
     WALLETS |o..o{ MONEY_MOVEMENTS : "posts wallet ledger entries"
     CAMPAIGNS |o..o{ MONEY_MOVEMENTS : "locks and unlocks reserves"
     SALES |o..o{ MONEY_MOVEMENTS : "records 5pct split and commission"
@@ -181,6 +182,13 @@ erDiagram
         uuid dispute_resolved_by_admin_id FK "nullable"
         timestamptz dispute_resolved_at "nullable"
         timestamptz created_at
+    }
+    PAYOUT_RECEIPT_FILES {
+        uuid payout_id PK, FK
+        text content_type
+        bytea file_data "max 5 MB"
+        uuid uploaded_by_admin_id FK
+        timestamptz uploaded_at
     }
     IDEMPOTENCY_RECORDS {
         uuid actor_id FK

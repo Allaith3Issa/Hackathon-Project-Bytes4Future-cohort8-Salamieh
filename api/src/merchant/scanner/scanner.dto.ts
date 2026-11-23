@@ -25,10 +25,28 @@ export class RedeemOfferDto extends ScannerLookupDto {
   @Max(1)
   quantity?: number;
 
-  @ApiPropertyOptional({ deprecated: true })
+  @ApiPropertyOptional({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
   @IsOptional()
   @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
   originalBillSyp?: number;
+}
+
+export class PreviewOfferDto extends ScannerLookupDto {
+  @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  originalBillSyp!: number;
+}
+
+export class RedeemVoucherDto extends ScannerLookupDto {
+  @ApiProperty({ minimum: 1, maximum: Number.MAX_SAFE_INTEGER })
+  @IsInt()
+  @Min(1)
+  @Max(Number.MAX_SAFE_INTEGER)
+  billTotalSyp!: number;
 }
 
 export class ScannerOfferLookupResponseDto {
@@ -41,8 +59,8 @@ export class ScannerOfferLookupResponseDto {
   @ApiProperty({ format: 'uuid' })
   campaignId!: string;
 
-  @ApiProperty({ enum: ['product'] })
-  campaignType!: 'product';
+  @ApiProperty({ enum: ['product', 'store_discount'] })
+  campaignType!: 'product' | 'store_discount';
 
   @ApiProperty()
   productName!: string;
@@ -53,8 +71,8 @@ export class ScannerOfferLookupResponseDto {
   @ApiProperty({ minimum: 0, maximum: 100 })
   discountPercent!: number;
 
-  @ApiProperty({ minimum: 0 })
-  finalPriceSyp!: number;
+  @ApiProperty({ minimum: 0, nullable: true })
+  finalPriceSyp!: number | null;
 
   @ApiProperty({ nullable: true })
   maxQuantity!: number | null;
@@ -73,6 +91,43 @@ export class ScannerOfferLookupResponseDto {
 
   @ApiProperty({ enum: ['active'] })
   status!: 'active';
+}
+
+export class ScannerVoucherLookupResponseDto {
+  @ApiProperty({ enum: ['cashback_voucher'] })
+  kind!: 'cashback_voucher';
+
+  @ApiProperty({ format: 'uuid' })
+  voucherId!: string;
+
+  @ApiProperty()
+  customerName!: string;
+
+  @ApiProperty({ minimum: 1 })
+  amountSyp!: number;
+
+  @ApiProperty({ enum: ['active'] })
+  status!: 'active';
+}
+
+export class StoreDiscountPreviewResponseDto {
+  @ApiProperty({ minimum: 0 })
+  customerPaidCashSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  marketerCommissionSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  platformTotalFeeSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  customerCashbackSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  platformNetFeeSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  totalDeductedReserveSyp!: number;
 }
 
 export class OfferRedeemResponseDto {
@@ -114,4 +169,24 @@ export class OfferRedeemResponseDto {
 
   @ApiProperty({ format: 'date-time' })
   scannedAt!: string;
+}
+
+export class VoucherRedeemResponseDto {
+  @ApiProperty({ format: 'uuid' })
+  voucherId!: string;
+
+  @ApiProperty({ minimum: 1 })
+  amountSyp!: number;
+
+  @ApiProperty({ minimum: 1 })
+  billTotalSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  customerPaidCashSyp!: number;
+
+  @ApiProperty({ minimum: 0 })
+  merchantNewAvailableBalanceSyp!: number;
+
+  @ApiProperty({ format: 'date-time' })
+  redeemedAt!: string;
 }

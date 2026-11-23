@@ -342,7 +342,7 @@ type MerchantWalletTransaction = {
 };
 ```
 
-### Store-discount checkout (future)
+### Store-discount checkout
 
 `POST /merchant/scanner/preview-offer` takes `{ code, originalBillSyp }` and requires the verified campaign owner. It returns `200 StoreDiscountPreview`. The pass must belong to a store-discount campaign. Use the same pricing and validation as redemption. Validate the positive bill and discounted cash amount, campaign state, remaining volume and reserve. At confirmation, `redeem-offer` takes the same bill and code and repeats those checks under the campaign lock. Reject discounted cash above the remaining volume with `409 CAMPAIGN_LIMIT_EXCEEDED` and keep the pass active. Reduce remaining volume by discounted cash paid. On reaching the cap, close and release any remaining reserve within the sale transaction.
 
@@ -368,6 +368,7 @@ type StoreDiscountPreview = {
 | `GET /marketer/payouts` | Marketer | Pagination, optional `status` | `200 Page<PayoutRequest>` |
 | `POST /marketer/payouts/{payoutId}/confirm` | Marketer owner | None | `200 PayoutRequest` (`transferred` -> `confirmed`) |
 | `POST /marketer/payouts/{payoutId}/dispute` | Marketer owner | `{ reason: string }` | `200 PayoutRequest` (`transferred` -> `disputed`) |
+| `GET /marketer/payouts/{payoutId}/receipt` | Payout owner or Admin | None | `200` receipt image bytes |
 | `GET /marketer/stats` | Marketer | None | `200 MarketerStats` |
 | `GET /public/leaderboard` | Public, optional bearer | Pagination | `200 Page<LeaderboardEntry> & { myRank: number \| null }` |
 
@@ -461,10 +462,11 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 | `GET /admin/campaigns` | Admin | Pagination, optional `status` | `200 Page<AdminCampaign>` |
 | `GET /admin/overview` | Admin | None | `200 AdminOverview` |
 
-### Payout accounting (future)
+### Payout accounting
 
 - Requesting a payout moves funds from available to pending. Only a `pending_review` request can be rejected before transfer. Rejection releases the hold once.
 - After sending funds, the admin records the receipt and a transfer reference unique per payment method. Moving to `transferred` clears the pending hold and records the external cash outflow in the same transaction. Repeating the same recorded transfer returns its existing result. Conflicting transfers or invalid transitions return `409 INVALID_STATUS_TRANSITION`.
+- Receipt uploads accept JPEG, PNG, or WebP images up to 5 MB. The API stores images privately and returns a relative `transferReceiptUrl`; fetch the image through the authenticated receipt route as the payout owner or an Admin.
 - The marketer can confirm or dispute a transferred payout. A periodic reconciliation marks still-transferred payouts confirmed once 72 hours have passed. Serialize transitions on the payout row and apply any due auto-confirmation before accepting a dispute. Confirmation and dispute change the payout status and preserve the receipt. The wallet was settled when the transfer was recorded.
 - An admin resolves a dispute by confirming payment or verifying that the full transfer returned to the platform. On verified return, record the reversal reference and cash inflow, restore the amount to available, and mark the payout rejected in one transaction. Keep the original transfer record. Repeating the same resolution returns the existing result. Conflicting resolutions return `409 INVALID_STATUS_TRANSITION`.
 - Pending payout liabilities cover pre-transfer holds. Report transferred or disputed payouts separately and include only confirmed payouts in `totalConfirmedPaidOutSyp`.
