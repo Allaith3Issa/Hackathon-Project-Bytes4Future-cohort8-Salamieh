@@ -2,6 +2,8 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { localizedPath, splitLocale } from "@/lib/locale";
+import { campaignListQuery, discoverCampaignsPath, marketerMembershipsPath } from "@/lib/marketer-campaigns";
+import { payoutPage, payoutStatus } from "@/lib/payouts";
 import { merchantVerificationStatuses } from "@/lib/staff-contract";
 import { validReferral } from "@/lib/ui";
 import { useI18n } from "./i18n-provider";
@@ -21,6 +23,14 @@ export function LanguageSwitcher() {
   const [status, extraStatus] = query.getAll("status");
   if (pathname === "/admin/merchants" && extraStatus === undefined && merchantVerificationStatuses.some((value) => value === status)) {
     parameters.set("status", status);
+  }
+  if (pathname === discoverCampaignsPath || pathname === marketerMembershipsPath) {
+    for (const [key, value] of campaignListQuery(query, pathname)) parameters.set(key, value);
+  }
+  if (pathname === "/admin/payouts" || pathname === "/marketer/earnings") {
+    if (extraStatus === undefined && (status === "all" || (status && payoutStatus(status)))) parameters.set("status", status);
+    const [activity, extraActivity] = query.getAll("activityPage");
+    if (pathname === "/marketer/earnings" && extraActivity === undefined && payoutPage(activity) > 1) parameters.set("activityPage", activity);
   }
   const search = parameters.size ? `?${parameters}` : "";
   return (

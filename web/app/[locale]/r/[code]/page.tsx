@@ -8,19 +8,10 @@ import { getAccount } from "@/lib/session";
 import { errorMessage, validReferral } from "@/lib/ui";
 import { SignInForm } from "@/components/sign-in-form";
 import { OfferPass, OfferVisit } from "./offer-pass";
+import { CampaignImage } from "@/components/campaign-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getI18n()).t("offers.offerDetails") };
-}
-
-function offerImage(url: string) {
-  try {
-    const parsed = new URL(url);
-    if (["https:", "http:"].includes(parsed.protocol) && !parsed.username && !parsed.password) return parsed.href;
-  } catch {
-    return null;
-  }
-  return null;
 }
 
 export default async function OfferPage({ params }: { params: Promise<{ code: string }> }) {
@@ -49,7 +40,6 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
   const active = offer.status === "active";
   const account = active ? await getAccount().catch(() => null) : null;
   const signedIn = account?.roles.includes("customer") ?? false;
-  const image = offerImage(offer.imageUrl);
 
   return (
     <div className="page-wrap py-7 sm:py-12">
@@ -82,15 +72,12 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
           </div>
         </div>
         <div className="stamp-depth overflow-hidden rounded-xl border border-rule bg-mauve lg:col-start-2 lg:row-start-1 lg:row-span-2">
-          {image ? (
-           
-            <img src={image} alt={offer.productName} referrerPolicy="no-referrer" className="aspect-[4/3] max-h-[50vh] w-full object-cover lg:aspect-[5/4] lg:max-h-none" />
-          ) : (
+          <CampaignImage url={offer.imageUrl} alt={offer.productName} className="aspect-[4/3] max-h-[50vh] w-full object-cover lg:aspect-[5/4] lg:max-h-none" fallback={
             <div className="px-5 py-4 sm:px-7 lg:grid lg:min-h-40 lg:content-center lg:gap-2 lg:px-8">
               <h2 className="text-base font-bold lg:text-2xl">{t("offers.aboutTheStore")}</h2>
               <p className="mt-1 text-sm leading-7 text-muted lg:mt-0 lg:text-base">{offer.shopDetails || offer.shopName}</p>
             </div>
-          )}
+          } />
         </div>
         <div className="lg:col-start-1 lg:row-start-2">
           {!active ? (

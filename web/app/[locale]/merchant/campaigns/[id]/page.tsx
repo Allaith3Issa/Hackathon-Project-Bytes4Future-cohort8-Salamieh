@@ -10,6 +10,7 @@ import { authenticatedRequest } from "@/lib/session";
 import { expiredRedirect, requirePageRole } from "@/lib/staff";
 import type { MerchantCampaign, MerchantWallet, MerchantWalletTransaction, Page } from "@/lib/staff-contract";
 import { staffError, statusLabels } from "@/lib/staff-ui";
+import { CampaignImage } from "@/components/campaign-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getI18n()).t("campaigns.campaignDetails") };
@@ -46,6 +47,8 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <h1 className="page-title">{c.productName}</h1>
         <p className="mt-1 text-muted">{t(statusLabels[c.status])}{" "}{t("campaigns.ends2")}{" "}{formatDate(c.endsAt)}</p>
       </div>
+      <CampaignImage url={c.imageUrl} alt={c.productName} className="aspect-[4/3] w-full max-w-sm rounded-xl bg-mauve object-cover"
+        fallback={<div className="notice max-w-sm">{t("productImage.unavailable")}</div>} />
       <dl className="stamp-depth grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-ink p-5 text-white sm:p-7">
           <dt className="text-sm font-semibold">{t("campaigns.currentLockedReserve")}</dt>
