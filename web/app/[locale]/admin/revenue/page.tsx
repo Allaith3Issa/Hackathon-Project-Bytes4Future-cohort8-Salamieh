@@ -58,7 +58,7 @@ export default async function RevenueDashboardPage({
       </header>
       {revenue ? (
         <div className="grid gap-4 sm:grid-cols-2">
-          <section aria-labelledby="platform-revenue" className="min-w-0 rounded-xl bg-ink p-5 text-white sm:p-7">
+          <section aria-labelledby="platform-revenue" className="stamp-depth min-w-0 rounded-xl bg-ink p-5 text-white sm:p-7">
             <h2 id="platform-revenue" className="text-lg font-bold">{t("earnings.platformTitle")}</h2>
             <dl className="mt-3">
               <dt className="text-sm font-semibold text-mauve">{t("earnings.netPlatformFees")}</dt>

@@ -1,7 +1,3 @@
 :global(#main-content):has(> .page) {
   display: grid;
 }
-
-.page {
-  background: linear-gradient(135deg, var(--color-mauve) 0%, var(--color-canvas) 100%);
-}

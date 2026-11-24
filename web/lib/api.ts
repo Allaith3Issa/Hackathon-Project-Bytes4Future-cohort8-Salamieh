@@ -25,13 +25,14 @@ export async function apiRequest<T>(
   const headers = new Headers({ Accept: "application/json" });
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
   if (idempotencyKey) headers.set("Idempotency-Key", idempotencyKey);
-  if (body !== undefined) headers.set("Content-Type", "application/json");
+  const multipart = body instanceof FormData;
+  if (body !== undefined && !multipart) headers.set("Content-Type", "application/json");
   let response: Response;
   try {
     response = await fetch(`${base}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
       redirect: "error",
       signal: AbortSignal.timeout(10000),

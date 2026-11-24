@@ -7,9 +7,9 @@ const roleInfo = {
   customer: {
     title: "roles.customer",
     description: "roles.findOffersSaveWithDiscountsAnd",
-    selected: "border-action bg-[#fff2e8]",
-    badge: "bg-[#fff2e8] text-action-hover",
-    check: "border-action bg-action text-white",
+    selected: "border-control bg-mauve",
+    badge: "bg-mauve text-ink",
+    check: "border-ink bg-ink text-white",
     icon: "M5 8h14l1 13H4L5 8Zm4 1V6a3 3 0 0 1 6 0v3",
   },
   marketer: {
@@ -42,7 +42,7 @@ export function RegistrationRoleCards({ roles, onToggle }: {
         const info = roleInfo[role];
         const checked = roles.includes(role);
         return (
-          <label key={role} className={`grid cursor-pointer items-start gap-x-3 gap-y-1 rounded-xl border p-3.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-action motion-safe:transition-colors sm:gap-y-2 sm:p-4 ${checked ? info.selected : "border-rule bg-white hover:border-control"} grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto]`}>
+          <label key={role} className={`grid cursor-pointer items-start gap-x-3 gap-y-1 rounded-xl border p-3.5 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ink motion-safe:transition-colors sm:gap-y-2 sm:p-4 ${checked ? info.selected : "border-rule bg-white hover:border-control"} grid-cols-[auto_minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto]`}>
             <input type="checkbox" value={role} checked={checked} onChange={() => onToggle(role)} className="sr-only"
               aria-labelledby={`registration-role-${role}`} aria-describedby={`registration-description-${role}`} />
             <span className={`row-span-2 grid size-9 place-items-center rounded-lg sm:col-start-1 sm:row-span-1 ${info.badge}`} aria-hidden="true">

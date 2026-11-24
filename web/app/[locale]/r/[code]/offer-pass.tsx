@@ -50,27 +50,29 @@ export function OfferPass({ code }: { code: string }) {
   }
 
   return (
-    <section className="surface overflow-hidden" aria-labelledby="offer-pass-title">
-      <div className="border-b border-rule bg-mauve px-5 py-4 sm:px-6">
-        <h2 id="offer-pass-title" ref={passTitle} tabIndex={-1} className="text-xl font-bold">{t("offers.yourDiscountPassIsReady")}</h2>
-        <p className="mt-1 text-sm leading-7 text-muted">
-          {t("offers.showPassAtCheckout")}
-        </p>
-      </div>
-      <div className="px-5 py-4 sm:px-6">
-        {image ? (
-       
-          <img src={image} width={256} height={256} alt={t("offers.discountPassQrCode")} className="mx-auto mb-4 h-auto max-w-full" />
-        ) : <p className="notice mb-4">{t("offers.giveTheMerchantTheManualCode")}</p>}
-        <label htmlFor="pass-code" className="block">{t("offers.manualCode")}</label>
-        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
-          <input id="pass-code" ref={field} readOnly dir="ltr" value={passCode} className="min-w-0 flex-1 text-center font-mono" />
-          <button type="button" className="button-secondary" onClick={copy}>{t("offers.copyCode")}</button>
+    <section className="offer-ticket" aria-labelledby="offer-pass-title">
+      <div className="ticket-paper">
+        <div className="ticket-seam bg-mauve px-5 py-4 sm:px-6">
+          <h2 id="offer-pass-title" ref={passTitle} tabIndex={-1} className="text-xl font-bold">{t("offers.yourDiscountPassIsReady")}</h2>
+          <p className="mt-1 text-sm leading-7 text-muted">
+            {t("offers.showPassAtCheckout")}
+          </p>
         </div>
-        <p role="status" className={copyStatus === "copied" ? "text-sm text-success" : "text-sm text-muted"}>
-          {copyStatus === "copied" && <span className="mt-2 block">{t("offers.codeCopied")}</span>}
-          {copyStatus === "selected" && <span className="mt-2 block">{t("offers.theCodeHasBeenSelectedYou")}</span>}
-        </p>
+        <div className="px-5 py-4 sm:px-6">
+          {image ? (
+
+            <img src={image} width={256} height={256} alt={t("offers.discountPassQrCode")} className="mx-auto mb-4 h-auto max-w-full" />
+          ) : <p className="notice mb-4">{t("offers.giveTheMerchantTheManualCode")}</p>}
+          <label htmlFor="pass-code" className="block">{t("offers.manualCode")}</label>
+          <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <input id="pass-code" ref={field} readOnly dir="ltr" value={passCode} className="min-w-0 flex-1 text-center font-mono" />
+            <button type="button" className="button-secondary" onClick={copy}>{t("offers.copyCode")}</button>
+          </div>
+          <p role="status" className={copyStatus === "copied" ? "text-sm text-success" : "text-sm text-muted"}>
+            {copyStatus === "copied" && <span className="mt-2 block">{t("offers.codeCopied")}</span>}
+            {copyStatus === "selected" && <span className="mt-2 block">{t("offers.theCodeHasBeenSelectedYou")}</span>}
+          </p>
+        </div>
       </div>
     </section>
   );
