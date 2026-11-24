@@ -1,4 +1,6 @@
-# Local demo seed
+# Local rehearsal seed
+
+For the five account-only evaluator fixtures, use the [evaluator seed](../../README.md#demo-accounts-and-database-seeding). The commands below provision the separate rehearsal and scanner fixtures.
 
 By default, use a dedicated local PostgreSQL database, such as `affiliate_marketing_demo`. The seed accepts loopback hosts and database names starting with `affiliate_marketing_demo` or `affiliate_marketing_seed_test`, with optional underscore-separated suffixes. This mode rejects the database named by `DATABASE_URL` and requires `NODE_ENV=development` or `NODE_ENV=test`.
 
@@ -6,7 +8,7 @@ From `api/`, run `npx --no prisma migrate deploy --config prisma7.config.ts` wit
 
 ```powershell
 $env:NODE_ENV = 'development'
-npm run db:seed
+npm run db:seed:rehearsal
 ```
 
 The first run creates both fixtures in one transaction. Later runs leave the fixtures as they are, including any subsequent top-ups, sales, status changes, expiry dates, and credentials. A conflicting identifier on first run aborts the transaction. Use a fresh dedicated database to start a new rehearsal from the initial state.
@@ -18,7 +20,7 @@ For local Swagger testing, `DATABASE_URL` must identify the loopback `affiliate_
 ```powershell
 $env:NODE_ENV = 'development'
 $env:ALLOW_DEV_DEMO_SEED = '1'
-try { npm run db:seed } finally { Remove-Item Env:ALLOW_DEV_DEMO_SEED }
+try { npm run db:seed:rehearsal } finally { Remove-Item Env:ALLOW_DEV_DEMO_SEED }
 ```
 
 This mode uses `DATABASE_URL`. The first run requires empty application tables. A rerun verifies the seed marker and expected account identities, then leaves their credentials, balances, and activity intact.

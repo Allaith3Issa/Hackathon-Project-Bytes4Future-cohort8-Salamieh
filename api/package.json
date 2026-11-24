@@ -15,8 +15,10 @@
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "db:check": "npm run build && node dist/prisma/check-connection.js",
-    "predb:seed": "npm run build",
-    "db:seed": "node --env-file-if-exists=.env dist/prisma/seed.js",
+    "predb:seed": "npm run prisma:generate && tsc -p prisma/tsconfig.seed.json",
+    "db:seed": "node --env-file-if-exists=.env dist/evaluator-seed/prisma/seed.js",
+    "predb:seed:rehearsal": "npm run build",
+    "db:seed:rehearsal": "node --env-file-if-exists=.env dist/prisma/seed.js",
     "admin:bootstrap": "node dist/admin/bootstrap-admin.js",
     "pretest": "npm run build",
     "test": "node --test test/*.test.cjs"
