@@ -494,6 +494,7 @@
     "loadingTheOffer": "Loading the offer…",
     "generatingYourPass": "Generating your pass…",
     "getDiscountPass": "Get Discount Pass",
+    "ownReferralPassBlocked": "You can’t get a discount pass through your own referral link. To try the offer, open this link and sign in with a different customer account.",
     "showThePassToTheMerchant": "Show the pass to the merchant when you pay cash.",
     "yourDiscountPassIsReady": "Your Discount Pass Is Ready",
     "showTheCodeToTheMerchant": "Show the code to the merchant when you pay cash to apply the discount and record your",

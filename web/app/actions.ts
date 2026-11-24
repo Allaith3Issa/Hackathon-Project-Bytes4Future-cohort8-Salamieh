@@ -83,6 +83,9 @@ export async function issueOfferPass(code: string, _state: PassState): Promise<P
       .catch(() => null);
     return { pass: { code: pass.passCode, image } };
   } catch (error) {
+    if (error instanceof ApiError && error.code === "SELF_PROMOTION_FORBIDDEN") {
+      return { error: t("offers.ownReferralPassBlocked") };
+    }
     return { error: errorMessage(error, t) };
   }
 }
