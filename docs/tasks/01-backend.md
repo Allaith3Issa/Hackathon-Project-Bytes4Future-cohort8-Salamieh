@@ -18,9 +18,10 @@ All backend monetary amounts are integer hundredths of one new Syrian Pound. Use
 - **Verify.** Cover wrong-merchant rejection, concurrent or repeated redemption, lost-response retries, final-sale closure and balance reconciliation. Use the shared idempotency implementation for top-ups and settlement.
 - **First extension.** Own cashback voucher issuance, cancellation and redemption once the core flow passes.
 
-## Backlog ownership
+## Implementation status and backlog ownership
 
-- **Allaith** owns Backend registration, merchant verification, approval-based joining, merchant direct referrals, store-discount campaign pricing and configuration |.
-- **Laith** owns Backend voucher and store-discount checkout, payout and receipt workflows, wallet reporting, statistics and leaderboard data |.
+- **Implemented and verified:** Core backend, public registration, merchant verification, and wallet and statistics reads. See [implementation status](../handoff/IMPLEMENTATION_STATUS.md) for audit follow-ups and merge status.
+- **Allaith's deferred work:** Approval-based joining, full merchant direct-referral workflows, and store-discount campaign pricing and configuration.
+- **Laith's deferred work:** Voucher and store-discount checkout, payout and receipt workflows, and leaderboard data.
 
-The shared rehearsal and integration checks are in `HACKATHON_TASKS.md`.
+The shared rehearsal and integration checks are in [HACKATHON_TASKS.md](../handoff/HACKATHON_TASKS.md#demo-checks).

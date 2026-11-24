@@ -21,6 +21,7 @@
     "signInWithAnAccountThat": "سجّل الدخول بحساب يتضمّن دور العميل للعودة إلى العرض وإصدار بطاقة الخصم.",
     "signInToYourMardoodAccount": "سجّل الدخول إلى حسابك في مردود.",
     "yourSessionHasExpiredPleaseSign": "انتهت جلستك. سجّل الدخول مرة أخرى.",
+    "logoutUnconfirmed": "تم تسجيل خروجك من هذا المتصفح. تعذّر التأكد من إنهاء الجلسة على الخادم.",
     "needAnAccount": "ليس لديك حساب؟",
     "createAccount": "إنشاء حساب",
     "merchantSignIn": "دخول التاجر",

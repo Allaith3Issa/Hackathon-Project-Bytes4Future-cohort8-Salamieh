@@ -69,9 +69,32 @@ test('Step 11C reporting against isolated PostgreSQL', { skip: !databaseUrl, tim
   const buyer = await register(3, ['customer']);
   const otherSeller = await register(4, ['merchant']);
   const otherMarketer = await register(5, ['marketer']);
+  const marketerWithoutSales = await register(7, ['marketer']);
   const admin = await db.user.create({ data: { phone: '0999210006', name: 'Fixture admin',
     isAdmin: true, passwordHash: await bcrypt.hash(password, 10) } });
   const adminSession = await json(await post('auth/admin/login', { body: { phone: admin.phone, password } }), 200);
+  const revenue = () => read('admin/revenue', adminSession.accessToken);
+  const revenueSummary = () => read('admin/revenue/summary', adminSession.accessToken);
+  const marketerEarnings = (query = '') => read(`admin/revenue/marketers${query}`, adminSession.accessToken);
+
+  await t.test('platform revenue is zero without sales and requires an admin session', async () => {
+    assert.deepEqual(await revenue(), { netPlatformFeesSyp: 0 });
+    assert.deepEqual(await revenueSummary(), { netPlatformFeesSyp: 0, totalMarketerCommissionSyp: 0 });
+    assert.equal((await json(await request('admin/revenue'), 401)).code, 'AUTH_REQUIRED');
+    assert.equal((await json(await request('admin/revenue/summary'), 401)).code, 'AUTH_REQUIRED');
+    assert.equal((await json(await request('admin/revenue/marketers'), 401)).code, 'AUTH_REQUIRED');
+    assert.equal((await json(await request('admin/revenue', { token: 'invalid-token' }), 401)).code, 'AUTH_REQUIRED');
+    for (const actor of [buyer, seller, otherMarketer, multi]) {
+      assert.equal((await json(await request('admin/revenue', { token: actor.token }), 403)).code, 'FORBIDDEN');
+      assert.equal((await json(await request('admin/revenue/summary', { token: actor.token }), 403)).code, 'FORBIDDEN');
+      assert.equal((await json(await request('admin/revenue/marketers', { token: actor.token }), 403)).code, 'FORBIDDEN');
+    }
+    assert.equal((await json(await request('admin/revenue/marketers?pageSize=101', { token: adminSession.accessToken }), 400)).code,
+      'VALIDATION_ERROR');
+    const directory = await marketerEarnings();
+    assert.equal(directory.total, 3);
+    assert.ok(directory.items.every(({ salesCount, totalEarnedSyp }) => salesCount === 0 && totalEarnedSyp === 0));
+  });
 
   await t.test('empty histories and independent reads for a pending multi-role merchant', async () => {
     const contents = await Promise.all(Object.keys(routes).map((route) => read(route, multi.token)));
@@ -112,14 +135,45 @@ test('Step 11C reporting against isolated PostgreSQL', { skip: !databaseUrl, tim
   for (const code of [firstCode, firstCode, firstCode, secondCode, otherCode]) {
     assert.equal((await post(`public/referrals/${code}/clicks`)).status, 204);
   }
+
+  await t.test('top-ups, reserves, unused offers and rolled-back settlements do not contribute revenue', async () => {
+    const expired = await json(await post(`customer/referrals/${firstCode}/offer-qr`, { token: buyer.token }), 201);
+    await db.offerQrPass.update({ where: { passCode: expired.passCode }, data: { status: 'expired' } });
+    const unused = await json(await post(`customer/referrals/${otherCode}/offer-qr`, { token: buyer.token }), 201);
+    assert.deepEqual(await revenue(), { netPlatformFeesSyp: 0 });
+
+    await db.$executeRaw`CREATE FUNCTION reporting_test_reject_fee() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN
+        IF NEW.kind = 'platform_net_fee' THEN RAISE EXCEPTION 'Synthetic reporting ledger failure'; END IF;
+        RETURN NEW;
+      END;
+    $$`;
+    try {
+      await db.$executeRaw`CREATE TRIGGER reporting_test_reject_fee BEFORE INSERT ON money_movements
+        FOR EACH ROW EXECUTE FUNCTION reporting_test_reject_fee()`;
+      const failed = await json(await post('merchant/scanner/redeem-offer', { token: otherSeller.token, key: randomUUID(),
+        body: { code: unused.passCode } }), 500);
+      assert.equal(failed.code, 'INTERNAL_ERROR');
+      assert.equal(await db.sale.count(), 0);
+      const pass = await db.offerQrPass.findUniqueOrThrow({ where: { passCode: unused.passCode } });
+      assert.equal(pass.status, 'active');
+      assert.deepEqual(await revenue(), { netPlatformFeesSyp: 0 });
+    } finally {
+      await db.$executeRaw`DROP TRIGGER IF EXISTS reporting_test_reject_fee ON money_movements`;
+      await db.$executeRaw`DROP FUNCTION reporting_test_reject_fee()`;
+    }
+  });
+
   async function settle(customer, merchant, code, repeat = false) {
     const pass = await json(await post(`customer/referrals/${code}/offer-qr`, { token: customer.token }), 201);
     const redeem = (key) => post('merchant/scanner/redeem-offer', { token: merchant.token, key, body: { code: pass.passCode } });
     const key = randomUUID();
     const sale = await json(await redeem(key), 201);
     if (repeat) {
+      assert.deepEqual(await revenue(), { netPlatformFeesSyp: 2700 });
       assert.deepEqual(await json(await redeem(key), 201), sale);
       assert.equal((await json(await redeem(randomUUID()), 409)).code, 'QR_ALREADY_REDEEMED');
+      assert.deepEqual(await revenue(), { netPlatformFeesSyp: 2700 });
     }
     return sale;
   }
@@ -141,6 +195,21 @@ test('Step 11C reporting against isolated PostgreSQL', { skip: !databaseUrl, tim
     db.$queryRaw`SELECT md5(COALESCE(string_agg(row_data, E'\\n' ORDER BY row_data), '')) AS digest
       FROM (SELECT to_jsonb(r)::text AS row_data FROM ${Prisma.raw(table)} r) AS table_rows`));
   const before = await snapshot();
+
+  await t.test('platform revenue adds settled sales from both merchants without writing data', async () => {
+    assert.deepEqual(await revenue(), { netPlatformFeesSyp: 10800 });
+    assert.deepEqual(await revenueSummary(), { netPlatformFeesSyp: 10800, totalMarketerCommissionSyp: 40000 });
+    const first = await marketerEarnings('?pageSize=2');
+    const second = await marketerEarnings('?pageSize=2&page=2');
+    assert.deepEqual([first.total, first.nextPage, second.previousPage, second.nextPage], [3, 2, 1, null]);
+    assert.deepEqual([...first.items, ...second.items], [
+      { id: marketerWithoutSales.id, name: 'Fixture 7', phone: '0999210007', salesCount: 0, totalEarnedSyp: 0 },
+      { id: otherMarketer.id, name: 'Fixture 5', phone: '0999210005', salesCount: 1, totalEarnedSyp: 10000 },
+      { id: multi.id, name: 'Fixture 1', phone: '0999210001', salesCount: 3, totalEarnedSyp: 30000 },
+    ]);
+    assert.deepEqual((await marketerEarnings('?pageSize=2&page=3')).items, []);
+    assert.deepEqual(await snapshot(), before);
+  });
 
   await t.test('merchant wallet, campaign reserves, statistics and ledger reconcile', async () => {
     const wallet = await read('merchant/wallet', seller.token);
@@ -243,5 +312,41 @@ test('Step 11C reporting against isolated PostgreSQL', { skip: !databaseUrl, tim
     assert.match(schemas.MerchantWalletDto.properties.totalLockedReservesSyp.description, /hundredths of one new Syrian Pound/);
     assert.equal(schemas.MarketerWalletDto.properties.totalConfirmedPaidOutSyp.type, 'integer');
     assert.equal(schemas.CustomerPurchasePageDto.properties.items.items.$ref, '#/components/schemas/CustomerPurchaseDto');
+
+    const revenueRoute = docs.paths['/api/v1/admin/revenue'].get;
+    assert.deepEqual(revenueRoute.security, [{ bearer: [] }]);
+    assert.equal(revenueRoute.responses['200'].content['application/json'].schema.$ref, '#/components/schemas/AdminRevenueDto');
+    assert.deepEqual(revenueRoute.responses['200'].headers['Cache-Control'].schema.enum, ['no-store']);
+    assert.match(revenueRoute.responses['401'].description, /AUTH_REQUIRED.*SESSION_EXPIRED/);
+    assert.equal(revenueRoute.responses['403'].description, 'FORBIDDEN');
+    assert.equal(revenueRoute.responses['409'].description, 'AMOUNT_OUT_OF_RANGE');
+    assert.equal(revenueRoute.responses['500'].description, 'INTERNAL_ERROR');
+    const revenueSchema = schemas.AdminRevenueDto;
+    assert.deepEqual(revenueSchema.required, ['netPlatformFeesSyp']);
+    assert.deepEqual(Object.keys(revenueSchema.properties), ['netPlatformFeesSyp']);
+    const fees = revenueSchema.properties.netPlatformFeesSyp;
+    assert.equal(fees.type, 'integer');
+    assert.equal(fees.minimum, 0);
+    assert.equal(fees.maximum, Number.MAX_SAFE_INTEGER);
+    assert.match(fees.description, /hundredths of one new Syrian Pound/);
+  });
+
+  await t.test('platform revenue rejects a sum outside the safe integer range', async () => {
+    // Use a synthetic, split-consistent boundary value in this disposable database.
+    const sale = await db.sale.findFirstOrThrow();
+    const limit = BigInt(Number.MAX_SAFE_INTEGER);
+    try {
+      await db.sale.update({ where: { id: sale.id }, data: {
+        platformNetFeeSyp: limit, platformTotalFeeSyp: limit, totalDeductedReserveSyp: limit,
+        customerCashbackSyp: 0n, marketerCommissionSyp: 0n,
+      } });
+      assert.equal((await json(await request('admin/revenue', { token: adminSession.accessToken }), 409)).code,
+        'AMOUNT_OUT_OF_RANGE');
+    } finally {
+      const { platformNetFeeSyp, platformTotalFeeSyp, totalDeductedReserveSyp, customerCashbackSyp, marketerCommissionSyp } = sale;
+      await db.sale.update({ where: { id: sale.id }, data: {
+        platformNetFeeSyp, platformTotalFeeSyp, totalDeductedReserveSyp, customerCashbackSyp, marketerCommissionSyp,
+      } });
+    }
   });
 });

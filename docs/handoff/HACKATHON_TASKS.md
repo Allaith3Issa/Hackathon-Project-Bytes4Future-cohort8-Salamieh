@@ -27,6 +27,8 @@ Use seeded accounts and one NestJS API with PostgreSQL. Admin tops up a verified
 
 Use the [roadmap](HACKATHON_ROADMAP.md) for checkpoints and the [contract](API_CONTRACT.md#demo-operation-rules-and-shared-examples) for shared fixtures. Work on feature branches and integrate via focused pull requests. Keep secrets out of source control.
 
+The core backend is **implemented and verified** on isolated PostgreSQL. The integrated Web rehearsal is **implemented but not fully verified**. See [implementation status](IMPLEMENTATION_STATUS.md) for individual Web handoffs, BE-02, and TG-01. Audit the separate Expo repository last and deploy after system integration is complete.
+
 ## Backlog and first extension
 
 After the core demo is green, rehearse a voucher using the customer in the shared seed who is one purchase away from unlocking 50.00 new SYP. Future work includes store-wide discounts, approval mode, camera scanning, merchant direct referrals, full marketer web, payout receipt workflows, leaderboards and broad reporting.

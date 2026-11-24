@@ -5,7 +5,9 @@ import QRCode from "qrcode";
 import { apiRequest, ApiError } from "@/lib/api";
 import type { AuthSession, OfferQrPass } from "@/lib/contract";
 import { publicAccountDestination } from "@/lib/public-account-destination";
-import { authenticatedRequest, clearSession, saveSession, sessionTokens } from "@/lib/session";
+import { authenticatedRequest, saveSession } from "@/lib/session";
+import { endWebSession, type logoutScope } from "@/lib/session-logout";
+import { requireRole } from "@/lib/staff";
 import { errorMessage, validReferral } from "@/lib/ui";
 
 export interface SignInState {
@@ -53,22 +55,10 @@ export async function signIn(
   return redirectLocalized(destination);
 }
 
-export async function signOut() {
-  const { accessToken, refreshToken } = await sessionTokens();
-  try {
-    if (accessToken) {
-      await apiRequest<void>("/auth/logout", {
-        method: "POST",
-        accessToken,
-        body: refreshToken ? { refreshToken } : {},
-      });
-    }
-  } catch {
-     
-  } finally {
-    await clearSession();
-  }
-  return redirectLocalized("/login");
+export async function signOut(expected: ReturnType<typeof logoutScope>) {
+  const result = await endWebSession(expected);
+  if (result === "session-changed") return redirectLocalized("/");
+  return redirectLocalized(result === "unconfirmed" ? "/login?logout=unconfirmed" : "/login");
 }
 
 export async function recordReferralClick(code: string) {
@@ -82,6 +72,7 @@ export interface PassState {
 }
 
 export async function issueOfferPass(code: string, _state: PassState): Promise<PassState> {
+  await requireRole("customer");
   const { t } = await getI18n();
   if (!validReferral(code)) return { error: t("auth.weCouldnTFindTheReferral") };
   try {

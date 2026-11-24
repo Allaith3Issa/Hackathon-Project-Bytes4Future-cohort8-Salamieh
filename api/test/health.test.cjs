@@ -9,7 +9,9 @@ process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = 'postgresql://offline@127.0.0.1:1/health_unit_test';
 const { createApp } = require('../dist/main');
 const { PrismaService, DatabaseUnavailableError } = require('../dist/prisma/prisma.service');
+const { ApiConfigurationError } = require('../dist/prisma/database-config');
 const { validateApiConfig } = require('../dist/config/api-config');
+const { cashbackThresholds } = require('../dist/config/cashback-thresholds');
 
 test('GET /api/v1/health preserves the success response and hides database failure details', async (t) => {
   const app = await createApp({ logger: false });
@@ -79,6 +81,54 @@ test('production validates the database URL, signing secret and public web origi
   assert.throws(() => validateApiConfig({ ...config, WEB_BASE_URL: 'http://web.example.test' }), /WEB_BASE_URL/);
   assert.throws(() => validateApiConfig({ ...config, WEB_BASE_URL: 'https://web.example.test/path' }), /WEB_BASE_URL/);
   assert.doesNotThrow(() => validateApiConfig({ NODE_ENV: 'test' }));
+});
+
+test('startup accepts omitted cashback thresholds and valid overrides', () => {
+  const cases = [
+    [{}, { minimumPurchases: 5, minimumSpendSyp: 50000n }],
+    [{ CASHBACK_MILESTONE_PURCHASES: '7' }, { minimumPurchases: 7, minimumSpendSyp: 50000n }],
+    [{ CASHBACK_MILESTONE_SPEND_SYP: '75001' }, { minimumPurchases: 5, minimumSpendSyp: 75001n }],
+    [{ CASHBACK_MILESTONE_PURCHASES: '2147483647', CASHBACK_MILESTONE_SPEND_SYP: '9007199254740991' },
+      { minimumPurchases: 2147483647, minimumSpendSyp: 9007199254740991n }],
+  ];
+  for (const [settings, expected] of cases) {
+    const config = { NODE_ENV: 'test', ...settings };
+    assert.equal(validateApiConfig(config), config);
+    assert.deepEqual(cashbackThresholds({ get: (key) => config[key] }), expected);
+  }
+});
+
+test('startup rejects invalid cashback thresholds without echoing their values', () => {
+  for (const [setting, overflow] of [
+    ['CASHBACK_MILESTONE_PURCHASES', '2147483648'],
+    ['CASHBACK_MILESTONE_SPEND_SYP', '9007199254740992'],
+  ]) {
+    for (const value of ['', '-1', '0', '1.5', 'invalid-threshold-fixture', '01', overflow]) {
+      assert.throws(() => validateApiConfig({ NODE_ENV: 'test', [setting]: value }),
+        (error) => error instanceof ApiConfigurationError && error.message.startsWith(`${setting} must be a positive integer`) &&
+          !error.message.includes('invalid-threshold-fixture'));
+    }
+  }
+});
+
+test('the application rejects invalid cashback settings before listening in each environment', (t) => {
+  const cwd = mkdtempSync(join(tmpdir(), 'affiliate-cashback-config-'));
+  t.after(() => rmdirSync(cwd));
+  const env = { ...process.env, JWT_SECRET: 'z'.repeat(32), WEB_BASE_URL: 'https://web.example.test', PORT: '3000' };
+  delete env.CASHBACK_MILESTONE_PURCHASES;
+  delete env.CASHBACK_MILESTONE_SPEND_SYP;
+  for (const [mode, setting, value] of [
+    ['development', 'CASHBACK_MILESTONE_PURCHASES', '0'],
+    ['test', 'CASHBACK_MILESTONE_SPEND_SYP', '1.5'],
+    ['production', 'CASHBACK_MILESTONE_SPEND_SYP', 'invalid-threshold-fixture'],
+  ]) {
+    const run = spawnSync(process.execPath, [require.resolve('../dist/main')], {
+      cwd, env: { ...env, NODE_ENV: mode, [setting]: value }, encoding: 'utf8', timeout: 12000, windowsHide: true,
+    });
+    assert.equal(run.status, 1);
+    assert.match(run.stderr, new RegExp(`^${setting} must be a positive integer`, 'm'));
+    assert.doesNotMatch(run.stdout + run.stderr, /invalid-threshold-fixture|Nest application successfully started/);
+  }
 });
 
 test('production startup fails clearly with missing, invalid or unreachable database configuration', (t) => {

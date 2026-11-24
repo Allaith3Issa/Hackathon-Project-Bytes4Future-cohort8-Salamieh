@@ -39,7 +39,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
           <p className="mt-2 leading-7 text-muted">{missing ? t("offers.checkTheLinkYouReceivedThen") : errorMessage(error, t)}</p>
           <div className="mt-5 flex flex-wrap items-center gap-4">
             {!missing && <a className="button-primary" href={localizedPath(`/r/${code}`, locale)}>{t("common.tryAgain")}</a>}
-            <Link href="/" className={missing ? "button-secondary" : "text-link"}>{t("common.home")}</Link>
+            <Link href="/login" className={missing ? "button-secondary" : "text-link"}>{t("common.signIn")}</Link>
           </div>
         </div>
       </section>
@@ -47,7 +47,7 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
   }
 
   const active = offer.status === "active";
-  const account = active ? await getAccount() : null;
+  const account = active ? await getAccount().catch(() => null) : null;
   const signedIn = account?.roles.includes("customer") ?? false;
   const image = offerImage(offer.imageUrl);
 

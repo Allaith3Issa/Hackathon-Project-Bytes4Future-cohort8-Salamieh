@@ -1,12 +1,14 @@
 import "server-only";
 
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { cache } from "react";
 import { apiRequest, ApiError } from "./api";
 import type { Account, AuthSession } from "./contract";
+import { getI18n } from "./i18n-server";
+import { localizedPath } from "./locale";
+import { accessCookie, refreshCookie } from "./session-cookies";
 
-const accessCookie = "affiliate_access";
-const refreshCookie = "affiliate_refresh";
 const cookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -22,10 +24,12 @@ export async function sessionTokens() {
   };
 }
 
-export async function saveSession(session: AuthSession) {
+export async function saveSession(session: AuthSession, canSave?: () => boolean) {
   const jar = await cookies();
+  if (canSave && !canSave()) return false;
   jar.set(accessCookie, session.accessToken, { ...cookieOptions, maxAge: session.expiresInSeconds });
   jar.set(refreshCookie, session.refreshToken, { ...cookieOptions, maxAge: 2592000 });
+  return true;
 }
 
 export async function clearSession() {
@@ -44,6 +48,16 @@ export const getAccount = cache(async () => {
     throw error;
   }
 });
+
+export async function canShowGuestAuthForm() {
+  if (await getAccount()) {
+    const { locale } = await getI18n();
+    redirect(localizedPath("/", locale, true));
+  }
+
+  // A refresh cookie only permits recovery. The account must still be verified.
+  return !(await sessionTokens()).refreshToken;
+}
 
 export async function authenticatedRequest<T>(
   path: `/${string}`,

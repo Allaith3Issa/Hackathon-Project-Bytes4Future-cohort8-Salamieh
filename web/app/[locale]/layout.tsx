@@ -13,12 +13,13 @@ import "@fontsource/ibm-plex-sans/700.css";
 import { I18nProvider } from "@/components/i18n-provider";
 import { signOut } from "@/app/actions";
 import { HomeNavigation } from "@/components/home-navigation";
-import { SessionRefresh } from "@/components/session-refresh";
+import { SessionRefresh, SessionSignOut } from "@/components/session-refresh";
 import { SiteFooter } from "@/components/site-footer";
 
 import mardoodLogo from "../../public/brand/mardood-logo.png";
 import "../globals.css";
 import { getAccount, sessionTokens } from "@/lib/session";
+import { logoutScope } from "@/lib/session-logout";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -37,6 +38,9 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
   const { t } = await getI18n();
   const { accessToken, refreshToken } = await sessionTokens();
   const account = accessToken ? await getAccount().catch(() => null) : null;
+  const signOutForm = (account || refreshToken)
+    ? <SessionSignOut signOutAction={signOut.bind(null, logoutScope({ accessToken, refreshToken }))} label={t("navigation.signOut")} />
+    : null;
   const link = "inline-flex min-h-11 items-center rounded-lg px-2 font-semibold hover:bg-mauve sm:px-3";
   return (
     <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"}>
@@ -59,9 +63,9 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
                     {account.roles.includes("merchant") && <Link href="/merchant" className={link}>{t("navigation.merchantDashboard")}</Link>}
                     {account.roles.includes("marketer") && <Link href="/marketer/earnings" className={link}>{t("earnings.marketerTitle")}</Link>}
                     {account.roles.includes("admin") && <Link href="/admin/revenue" className={link}>{t("navigation.admin")}</Link>}
-                    <form action={signOut}><button className="button-secondary" type="submit">{t("navigation.signOut")}</button></form>
+                    {signOutForm}
                   </>
-                ) : <Link href="/login" className="button-secondary px-3 sm:px-4">{t("common.signIn")}</Link>}
+                ) : signOutForm ?? <Link href="/login" className="button-secondary px-3 sm:px-4">{t("common.signIn")}</Link>}
               </nav>
             </HomeNavigation>
           </div>

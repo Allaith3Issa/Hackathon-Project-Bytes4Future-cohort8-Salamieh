@@ -21,6 +21,7 @@
     "signInWithAnAccountThat": "Sign in with an account that includes the Customer role to return to the offer and get a discount pass.",
     "signInToYourMardoodAccount": "Sign in to your Mardood account.",
     "yourSessionHasExpiredPleaseSign": "Your session has expired. Please sign in again.",
+    "logoutUnconfirmed": "You’re signed out in this browser. We couldn’t confirm that the server session ended.",
     "needAnAccount": "Need an account?",
     "createAccount": "Create Account",
     "merchantSignIn": "Merchant Sign In",

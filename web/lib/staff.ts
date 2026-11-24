@@ -1,14 +1,24 @@
 import "server-only";
 import { redirectLocalized } from "./i18n-server";
 import { ApiError } from "./api";
-import { getAccount } from "./session";
+import type { Role } from "./contract";
+import { loginForRole } from "./route-access";
+import { getAccount, sessionTokens } from "./session";
 
-export async function requireRole(role: "admin" | "merchant") {
+export async function requireRole(role: Role) {
   const account = await getAccount();
-  if (!account || !account.roles.includes(role)) return redirectLocalized(role === "admin" ? "/admin" : "/merchant/login");
+  if (!account) return redirectLocalized(loginForRole(role));
+  if (!account.roles.includes(role)) return redirectLocalized("/");
   return account;
 }
 
-export async function expiredRedirect(error: unknown, role: "admin" | "merchant") {
-  if (error instanceof ApiError && error.status === 401) return redirectLocalized(role === "admin" ? "/admin" : "/merchant/login");
+export async function requirePageRole(role: Role) {
+  const account = await getAccount();
+  if (account) return account.roles.includes(role) ? account : redirectLocalized("/");
+  if ((await sessionTokens()).refreshToken) return null;
+  return redirectLocalized(loginForRole(role));
+}
+
+export async function expiredRedirect(error: unknown, role: Role) {
+  if (error instanceof ApiError && error.status === 401) return redirectLocalized(loginForRole(role));
 }

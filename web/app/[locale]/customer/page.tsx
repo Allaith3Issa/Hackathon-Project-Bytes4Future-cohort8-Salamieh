@@ -1,10 +1,11 @@
-import { getI18n, redirectLocalized } from "@/lib/i18n-server";
+import { getI18n } from "@/lib/i18n-server";
 import { localizedPath } from "@/lib/locale";
 import type { Metadata } from "next";
 import Link from "@/components/localized-link";
-import { ApiError } from "@/lib/api";
+import { RecoveringSession } from "@/components/recovering-session";
 import type { CustomerDashboard, CustomerPurchase, Page } from "@/lib/contract";
-import { authenticatedRequest, sessionTokens } from "@/lib/session";
+import { authenticatedRequest } from "@/lib/session";
+import { expiredRedirect, requirePageRole } from "@/lib/staff";
 import { errorMessage } from "@/lib/ui";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,17 +18,7 @@ export default async function CustomerPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const { t, locale, formatSyp, formatNumber, formatDate } = await getI18n();
-  const { accessToken, refreshToken } = await sessionTokens();
-  if (!accessToken) {
-    if (!refreshToken) return redirectLocalized("/login");
-    return (
-      <div className="page-wrap py-12">
-        <h1 className="page-title">{t("common.cashback")}</h1>
-        <p role="status" className="notice mt-4 max-w-lg">{t("customer.refreshingYourSession")}</p>
-        <Link href="/login" className="text-link mt-4 inline-block">{t("common.signIn")}</Link>
-      </div>
-    );
-  }
+  if (!(await requirePageRole("customer"))) return <RecoveringSession />;
 
   const { page } = await searchParams;
   const purchasePage = typeof page === "string" && /^[1-9][0-9]{0,7}$/.test(page) ? page : "1";
@@ -39,7 +30,7 @@ export default async function CustomerPage({
       authenticatedRequest<Page<CustomerPurchase>>(`/customer/purchases?page=${purchasePage}`),
     ]);
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401) return redirectLocalized("/login?expired=1");
+    await expiredRedirect(error, "customer");
     return (
       <div className="page-wrap py-12">
         <h1 className="page-title">{t("common.cashback")}</h1>

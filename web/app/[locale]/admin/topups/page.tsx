@@ -2,9 +2,10 @@ import { getI18n } from "@/lib/i18n-server";
 import { localizedPath } from "@/lib/locale";
 import type { Metadata } from "next";
 import { TopupForm } from "@/components/topup-form";
+import { RecoveringSession } from "@/components/recovering-session";
 import { ApiError } from "@/lib/api";
 import { authenticatedRequest } from "@/lib/session";
-import { expiredRedirect, requireRole } from "@/lib/staff";
+import { expiredRedirect, requirePageRole } from "@/lib/staff";
 import type { AdminMerchant, Page } from "@/lib/staff-contract";
 import { staffError } from "@/lib/staff-ui";
 
@@ -14,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function TopupsPage() {
   const { t, locale } = await getI18n();
-  await requireRole("admin");
+  if (!(await requirePageRole("admin"))) return <RecoveringSession />;
   let merchants: AdminMerchant[] = [];
   let failure: string | undefined;
   try {

@@ -6,19 +6,23 @@ import type { AuthSession } from "@/lib/contract";
 import { publicAccountDestination } from "@/lib/public-account-destination";
 import { validateRegistration, type RegistrationErrors } from "@/lib/registration";
 import { saveSession } from "@/lib/session";
-import { errorMessage } from "@/lib/ui";
+import { errorMessage, validReferral } from "@/lib/ui";
 
 export async function signUp(offer: string | undefined, _state: RegistrationErrors, data: FormData): Promise<RegistrationErrors> {
   const { t } = await getI18n();
   const { body, errors } = validateRegistration(data, t);
   if (Object.keys(errors).length) return errors;
 
+  let destination: string;
   try {
     const session = await apiRequest<AuthSession>("/auth/register", { method: "POST", body });
     if (session.user.roles.length !== body.roles.length || !body.roles.every((role) => session.user.roles.includes(role))) {
       return { error: t("registration.weCouldnTStartASession") };
     }
     await saveSession(session);
+    destination = typeof offer === "string" && validReferral(offer)
+      ? `/r/${offer}`
+      : publicAccountDestination(session.user.roles) ?? "/";
   } catch (error) {
     if (error instanceof ApiError) {
       if (error.code === "PHONE_ALREADY_REGISTERED") {
@@ -40,5 +44,5 @@ export async function signUp(offer: string | undefined, _state: RegistrationErro
     return { error: errorMessage(error, t) };
   }
 
-  return redirectLocalized(publicAccountDestination(body.roles, offer) ?? "/");
+  return redirectLocalized(destination);
 }

@@ -1,6 +1,8 @@
 import { getI18n } from "@/lib/i18n-server";
 import type { Metadata } from "next";
+import { RecoveringSession } from "@/components/recovering-session";
 import { SignUpForm } from "@/components/sign-up-form";
+import { canShowGuestAuthForm } from "@/lib/session";
 import { validReferral } from "@/lib/ui";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -10,6 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RegisterPage({ searchParams }: {
   searchParams: Promise<{ offer?: string }>;
 }) {
+  if (!(await canShowGuestAuthForm())) return <RecoveringSession authPage />;
   const { offer } = await searchParams;
   const referral = typeof offer === "string" && validReferral(offer) ? offer : undefined;
   return <SignUpForm offer={referral} />;
