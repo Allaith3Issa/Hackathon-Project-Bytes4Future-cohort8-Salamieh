@@ -1,5 +1,5 @@
 import { pageInfo } from '../common/pagination';
-import { ConflictException, ForbiddenException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { IdempotencyService } from '../common/idempotency/idempotency.service';
 import { MAX_MONEY_MINOR_UNITS, toMoneyJsonInteger } from '../common/money';
 import { Prisma, type MerchantTopup, type MerchantVerificationStatus } from '../generated/prisma/client';
@@ -35,17 +35,28 @@ export class AdminTopupService {
       }
 
       const amountSyp = BigInt(requestedAmount);
-      const { id: walletId } = await tx.wallet.findUniqueOrThrow({
-        where: { userId_role: { userId: targetId, role: 'merchant' } }, select: { id: true },
-      });
-      // PostgreSQL rechecks the bound on the updated row after concurrent writers release the lock.
-      const [wallet] = await tx.wallet.updateManyAndReturn({
-        where: { id: walletId, availableBalanceSyp: { lte: MAX_MONEY_MINOR_UNITS - amountSyp } },
-        data: { availableBalanceSyp: { increment: amountSyp } }, select: { availableBalanceSyp: true },
-      });
-      if (!wallet) {
+      const [currentWallet] = await tx.$queryRaw<{ id: string; availableSyp: bigint }[]>`
+        SELECT id, available_balance_syp AS "availableSyp"
+        FROM wallets WHERE user_id = ${targetId}::uuid AND role = 'merchant' FOR NO KEY UPDATE
+      `;
+      if (!currentWallet) throw new Error('Merchant wallet is missing.');
+
+      // Take a fresh READ COMMITTED snapshot after the wallet lock. Campaign writes that move
+      // reserves into or out of this wallet serialize here. A sale that skips the wallet only
+      // reduces the reserve. Leave campaign rows unlocked since closure holds them first.
+      const [reserves] = await tx.$queryRaw<{ remainingSyp: string }[]>`
+        SELECT COALESCE(SUM(locked_budget_syp), 0)::text AS "remainingSyp"
+        FROM campaigns WHERE merchant_id = ${targetId}::uuid AND locked_budget_syp > 0
+      `;
+      if (currentWallet.availableSyp + BigInt(reserves.remainingSyp) + amountSyp > MAX_MONEY_MINOR_UNITS) {
         throw new ConflictException({ statusCode: 409, code: 'AMOUNT_OUT_OF_RANGE', message: 'The credited merchant balance would exceed the supported range.' });
       }
+
+      const walletId = currentWallet.id;
+      const wallet = await tx.wallet.update({
+        where: { id: walletId }, data: { availableBalanceSyp: { increment: amountSyp } },
+        select: { availableBalanceSyp: true },
+      });
       const topup = await tx.merchantTopup.create({
         data: { merchantId: targetId, adminId, amountSyp, paymentMethod, referenceNote,
           merchantNewAvailableBalanceSyp: wallet.availableBalanceSyp },
@@ -56,21 +67,28 @@ export class AdminTopupService {
     });
   }
 
-  list({ page, pageSize, merchantId }: AdminTopupQueryDto): Promise<AdminTopupPageDto> {
+  async list({ page, pageSize, merchantId }: AdminTopupQueryDto): Promise<AdminTopupPageDto> {
     const where: Prisma.MerchantTopupWhereInput = merchantId === undefined ? {} : { merchantId };
-    return this.prisma.getClient().$transaction(async (tx) => {
-      const total = await tx.merchantTopup.count({ where });
-      const lastPage = Math.ceil(total / pageSize);
-      const topups = page > lastPage ? [] : await tx.merchantTopup.findMany({
-        where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize,
-        include: { merchant: { select: { shopName: true } } },
+    try {
+      return await this.prisma.getClient().$transaction(async (tx) => {
+        const total = await tx.merchantTopup.count({ where });
+        const lastPage = Math.ceil(total / pageSize);
+        const topups = page > lastPage ? [] : await tx.merchantTopup.findMany({
+          where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], skip: (page - 1) * pageSize, take: pageSize,
+          include: { merchant: { select: { shopName: true } } },
+        });
+        return {
+          items: topups.map((topup) => ({ ...topupFields(topup, topup.merchant.shopName),
+            merchantNewAvailableBalanceSyp: topup.merchantNewAvailableBalanceSyp === null
+              ? null : toMoneyJsonInteger(topup.merchantNewAvailableBalanceSyp) })),
+          ...pageInfo({ page, pageSize }, total),
+        };
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      throw new InternalServerErrorException({
+        statusCode: 500, code: 'INTERNAL_ERROR', message: 'Unable to load merchant top-up history.',
       });
-      return {
-        items: topups.map((topup) => ({ ...topupFields(topup, topup.merchant.shopName),
-          merchantNewAvailableBalanceSyp: topup.merchantNewAvailableBalanceSyp === null
-            ? null : toMoneyJsonInteger(topup.merchantNewAvailableBalanceSyp) })),
-        ...pageInfo({ page, pageSize }, total),
-      };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
+    }
   }
 }

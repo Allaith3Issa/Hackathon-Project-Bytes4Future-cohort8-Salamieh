@@ -284,4 +284,270 @@ test('Step 11B admin top-ups on isolated PostgreSQL', { skip: !databaseUrl, time
     assert.match(historical.description, /hundredths of one new Syrian Pound/);
     assert.equal(schemas.AdminTopupPageDto.properties.items.items.$ref, '#/components/schemas/AdminTopupHistoryEntryDto');
   });
+
+  const maxMoney = BigInt(Number.MAX_SAFE_INTEGER);
+  const reserve = 43500n;
+  let nextPhone = 10;
+
+  async function merchantFixture() {
+    const phone = `0999190${String(++nextPhone).padStart(3, '0')}`;
+    const account = await db.user.create({ data: {
+      phone, name: 'Reserve fixture', passwordHash,
+      merchantProfile: { create: { shopName: 'Reserve shop', shopDetails: 'Fixture details', verificationStatus: 'verified' } },
+      wallets: { create: { role: 'merchant' } },
+    } });
+    const session = await read(await request('POST', 'auth/login', { body: { phone, password } }), 200);
+    const credit = (amount, key) => create(Number(amount), { id: account.id, key });
+    await read(await credit(100000n), 201);
+    const launchFixture = () => request('POST', 'merchant/campaigns', { token: session.accessToken, key: randomUUID(), body: {
+      campaignType: 'product', productName: 'Reserve fixture', description: 'Reserve headroom fixture',
+      imageUrl: 'https://demo.example.test/product.jpg', originalPriceSyp: 100000, discountPercent: 10,
+      commission: { type: 'fixed', amountSyp: 10000 }, maxItems: 3, joinMode: 'open',
+      endsAt: new Date(Date.now() + 3600000).toISOString(),
+    } });
+    return {
+      id: account.id, token: session.accessToken, credit, launch: launchFixture,
+      close: (id) => request('POST', `merchant/campaigns/${id}/close`, { token: session.accessToken }),
+      balance: () => wallet('merchant', account.id),
+    };
+  }
+
+  function locked(id) {
+    return db.campaign.findUniqueOrThrow({ where: { id }, select: { status: true, lockedBudgetSyp: true } });
+  }
+
+  async function finance(fixture) {
+    const row = await fixture.balance();
+    const topups = await db.merchantTopup.findMany({ where: { merchantId: fixture.id }, orderBy: { id: 'asc' } });
+    const movements = await db.moneyMovement.findMany({ where: { walletId: row.id }, orderBy: { id: 'asc' } });
+    return { available: row.availableBalanceSyp, topups, movements };
+  }
+
+  async function reconcile(fixture, expectedAvailable, expectedReserve) {
+    const { available, topups, movements } = await finance(fixture);
+    assert.equal(available, expectedAvailable);
+    const byKind = (kind) => movements.filter((row) => row.kind === kind);
+    const sum = (rows) => rows.reduce((total, row) => total + row.amountSyp, 0n);
+    assert.equal(byKind('merchant_topup').length, topups.length);
+    assert.equal(sum(byKind('merchant_topup')), sum(topups));
+    assert.equal(available, sum(topups) - sum(byKind('campaign_reserve_lock')) + sum(byKind('campaign_reserve_unlock')));
+    const aggregate = await db.campaign.aggregate({ where: { merchantId: fixture.id }, _sum: { lockedBudgetSyp: true } });
+    assert.equal(aggregate._sum.lockedBudgetSyp ?? 0n, expectedReserve);
+    assert.ok(available + expectedReserve <= maxMoney);
+    return byKind('campaign_reserve_unlock');
+  }
+
+  await t.test('exact headroom closes at the maximum and a one-unit overflow rolls back', async () => {
+    const fixture = await merchantFixture();
+    const active = await read(await fixture.launch(), 201);
+    const before = await finance(fixture);
+    const key = randomUUID();
+    await fail(await fixture.credit(maxMoney - 100000n + 1n, key), 409, 'AMOUNT_OUT_OF_RANGE');
+    assert.deepEqual(await finance(fixture), before);
+    assert.deepEqual(await locked(active.id), { status: 'active', lockedBudgetSyp: reserve });
+    assert.equal(await db.idempotencyRecord.count({ where: { requestKey: key, actorId: admin.id } }), 0);
+
+    const receipt = await read(await fixture.credit(maxMoney - 100000n, key), 201);
+    assert.equal(BigInt(receipt.merchantNewAvailableBalanceSyp), maxMoney - reserve);
+    await read(await fixture.close(active.id), 200);
+    await read(await fixture.close(active.id), 200);
+    assert.deepEqual(await locked(active.id), { status: 'ended', lockedBudgetSyp: 0n });
+    const released = await reconcile(fixture, maxMoney, 0n);
+    assert.deepEqual(released.map(({ campaignId, amountSyp }) => [campaignId, amountSyp]), [[active.id, reserve]]);
+    const settled = await finance(fixture);
+    assert.deepEqual(await read(await fixture.credit(maxMoney - 100000n, key), 201), receipt);
+    await fail(await fixture.credit(1n, key), 409, 'IDEMPOTENCY_KEY_REUSED');
+    assert.deepEqual(await finance(fixture), settled);
+  });
+
+  await t.test('all outstanding reserves count, including an expired campaign before reconciliation', async () => {
+    const fixture = await merchantFixture();
+    const firstCampaign = await read(await fixture.launch(), 201);
+    const expired = await read(await fixture.launch(), 201);
+    await db.campaign.update({ where: { id: expired.id }, data: {
+      createdAt: new Date(Date.now() - 7200000), endsAt: new Date(Date.now() - 60000),
+    } });
+    const before = await finance(fixture);
+    await fail(await fixture.credit(maxMoney - 100000n + reserve), 409, 'AMOUNT_OUT_OF_RANGE');
+    assert.deepEqual(await finance(fixture), before);
+    assert.deepEqual(await locked(expired.id), { status: 'active', lockedBudgetSyp: reserve });
+    await read(await fixture.credit(maxMoney - 100000n), 201);
+    await read(await fixture.close(firstCampaign.id), 200);
+    const reconciled = await read(await request('GET', `merchant/campaigns/${expired.id}`, { token: fixture.token }), 200);
+    assert.equal(reconciled.status, 'ended');
+    const released = await reconcile(fixture, maxMoney, 0n);
+    assert.deepEqual(new Map(released.map(({ campaignId, amountSyp }) => [campaignId, amountSyp])),
+      new Map([[firstCampaign.id, reserve], [expired.id, reserve]]));
+  });
+
+  async function scannerFixture(fixture, campaignId) {
+    const membership = await db.campaignMarketer.create({ data: { campaignId, marketerId: marketer.id, status: 'approved' } });
+    const pass = await db.offerQrPass.create({ data: { campaignId, customerId: merchant.id, campaignMarketerId: membership.id,
+      qrToken: randomBytes(32).toString('base64url'), passCode: `OF-${randomBytes(6).toString('hex').toUpperCase()}` } });
+    const key = randomUUID();
+    return () => request('POST', 'merchant/scanner/redeem-offer', { token: fixture.token, key,
+      body: { code: pass.passCode, quantity: 1 } });
+  }
+
+  async function verifySale(campaignId, receipt, beforeCommission, beforeCashback) {
+    assert.equal(receipt.marketerCommissionSyp, 10000);
+    assert.equal(receipt.customerCashbackSyp, 1800);
+    assert.equal(receipt.platformNetFeeSyp, 2700);
+    assert.equal(receipt.remainingLockedBudgetSyp, 29000);
+    assert.equal((await wallet('marketer', marketer.id)).availableBalanceSyp, beforeCommission + 10000n);
+    assert.equal((await customer()).lockedCashbackSyp, beforeCashback + 1800n);
+    assert.equal(await db.sale.count({ where: { campaignId } }), 1);
+    const movements = await db.moneyMovement.findMany({ where: { saleId: receipt.saleId } });
+    assert.equal(movements.length, 4);
+    assert.deepEqual(new Map(movements.map(({ kind, amountSyp }) => [kind, amountSyp])), new Map([
+      ['sale_reserve_debit', 14500n], ['marketer_commission_credit', 10000n],
+      ['customer_cashback_accrual', 1800n], ['platform_net_fee', 2700n],
+    ]));
+  }
+
+  await t.test('a partially consumed campaign uses remaining reserve and releases exactly that remainder', async () => {
+    const fixture = await merchantFixture();
+    const active = await read(await fixture.launch(), 201);
+    const redeem = await scannerFixture(fixture, active.id);
+    const beforeCommission = (await wallet('marketer', marketer.id)).availableBalanceSyp;
+    const beforeCashback = (await customer()).lockedCashbackSyp;
+    const receipt = await read(await redeem(), 201);
+    await verifySale(active.id, receipt, beforeCommission, beforeCashback);
+    const accepted = await read(await fixture.credit(maxMoney - 100000n + 14500n), 201);
+    assert.equal(BigInt(accepted.merchantNewAvailableBalanceSyp), maxMoney - 29000n);
+    await read(await fixture.close(active.id), 200);
+    assert.deepEqual((await reconcile(fixture, maxMoney, 0n)).map(({ amountSyp }) => amountSyp), [29000n]);
+  });
+
+  const { setTimeout: delay } = require('node:timers/promises');
+  async function behindWalletLock(fixture, run) {
+    const blocker = new Client({ connectionString: databaseUrl, connectionTimeoutMillis: 3000, statement_timeout: 3000 });
+    const work = [];
+    await blocker.connect();
+    try {
+      const { rows: [gate] } = await blocker.query('SELECT pg_backend_pid() AS pid, current_database() AS db, host(inet_server_addr()) AS host');
+      assert.deepEqual({ db: gate.db, host: gate.host }, identity);
+      await blocker.query('BEGIN');
+      const guard = await blocker.query("SELECT id FROM wallets WHERE user_id = $1::uuid AND role = 'merchant' FOR NO KEY UPDATE", [fixture.id]);
+      assert.equal(guard.rowCount, 1);
+      function queue(action) {
+        const result = Promise.allSettled([action()]);
+        work.push(result);
+        return result;
+      }
+      async function waitFor(count) {
+        const deadline = Date.now() + 2200;
+        while (Date.now() < deadline) {
+          const [waiting] = await db.$queryRaw`
+            WITH RECURSIVE queue(pid) AS (
+              SELECT ${gate.pid}::integer
+              UNION
+              SELECT activity.pid FROM pg_stat_activity activity
+              JOIN queue ON queue.pid = ANY(pg_blocking_pids(activity.pid))
+              WHERE datname = current_database()
+            )
+            SELECT count(*)::integer - 1 AS count FROM queue
+          `;
+          if (waiting.count >= count) return;
+          await delay(15);
+        }
+        assert.fail(`Expected ${count} blocked wallet operations`);
+      }
+      await run({ queue, waitFor });
+    } finally {
+      await blocker.end().finally(() => Promise.all(work));
+    }
+    return (await Promise.all(work)).map(([result]) => {
+      if (result.status === 'rejected') throw result.reason;
+      return result.value;
+    });
+  }
+
+  await t.test('competing top-ups at the cap commit only one credit', async () => {
+    const fixture = await merchantFixture();
+    const active = await read(await fixture.launch(), 201);
+    const before = await finance(fixture);
+    const keys = [randomUUID(), randomUUID()];
+    const credit = maxMoney - 100000n;
+    const responses = await behindWalletLock(fixture, async ({ queue, waitFor }) => {
+      void queue(() => fixture.credit(credit, keys[0]));
+      await waitFor(1);
+      void queue(() => fixture.credit(credit, keys[1]));
+      await waitFor(2);
+    });
+    assert.equal(responses[0].status, 201);
+    await fail(responses[1], 409, 'AMOUNT_OUT_OF_RANGE');
+    const after = await finance(fixture);
+    assert.equal(after.topups.length, before.topups.length + 1);
+    assert.equal(after.movements.length, before.movements.length + 1);
+    assert.equal(await db.idempotencyRecord.count({ where: { requestKey: keys[1], actorId: admin.id } }), 0);
+    await reconcile(fixture, maxMoney - reserve, reserve);
+    await read(await fixture.close(active.id), 200);
+    await reconcile(fixture, maxMoney, 0n);
+  });
+
+  await t.test('launch commits a new reserve before the waiting top-up rechecks headroom', async () => {
+    const fixture = await merchantFixture();
+    const [launchResponse, creditResponse] = await behindWalletLock(fixture, async ({ queue, waitFor }) => {
+      void queue(fixture.launch);
+      await waitFor(1);
+      void queue(() => fixture.credit(maxMoney - 100000n + 1n));
+      await waitFor(2);
+    });
+    const launched = await read(launchResponse, 201);
+    assert.deepEqual(await locked(launched.id), { lockedBudgetSyp: reserve, status: 'active' });
+    await fail(creditResponse, 409, 'AMOUNT_OUT_OF_RANGE');
+    await reconcile(fixture, 100000n - reserve, reserve);
+    assert.equal((await finance(fixture)).topups.length, 1);
+  });
+
+  await t.test('top-up does not wait on the campaign row held by competing closure', async () => {
+    const fixture = await merchantFixture();
+    const active = await read(await fixture.launch(), 201);
+    const [creditResponse, closeResponse] = await behindWalletLock(fixture, async ({ queue, waitFor }) => {
+      void queue(() => fixture.credit(maxMoney - 100000n));
+      await waitFor(1);
+      void queue(() => fixture.close(active.id));
+      await waitFor(2);
+    });
+    assert.equal(BigInt((await read(creditResponse, 201)).merchantNewAvailableBalanceSyp), maxMoney - reserve);
+    await read(closeResponse, 200);
+    const released = await reconcile(fixture, maxMoney, 0n);
+    assert.deepEqual(released.map(({ campaignId, amountSyp }) => [campaignId, amountSyp]), [[active.id, reserve]]);
+  });
+
+  await t.test('settlement reduces reserve before the competing top-up reads it', async () => {
+    const fixture = await merchantFixture();
+    const active = await read(await fixture.launch(), 201);
+    const redeem = await scannerFixture(fixture, active.id);
+    const beforeCommission = (await wallet('marketer', marketer.id)).availableBalanceSyp;
+    const beforeCashback = (await customer()).lockedCashbackSyp;
+    let receipt;
+    const [creditResponse] = await behindWalletLock(fixture, async ({ queue, waitFor }) => {
+      void queue(() => fixture.credit(maxMoney - 100000n + 14500n));
+      await waitFor(1);
+      receipt = await read(await redeem(), 201);
+    });
+    await read(creditResponse, 201);
+    await verifySale(active.id, receipt, beforeCommission, beforeCashback);
+    assert.deepEqual(await read(await redeem(), 201), receipt);
+    await reconcile(fixture, maxMoney - 29000n, 29000n);
+    await read(await fixture.close(active.id), 200);
+    await reconcile(fixture, maxMoney, 0n);
+  });
+
+  await t.test('history sanitizes an unexpected read failure and preserves an existing domain error', async (subtest) => {
+    const { ConflictException } = require('@nestjs/common');
+    const detail = 'synthetic private database failure';
+    let failure = new Error(detail);
+    const failingClient = new Proxy(db, { get: (target, property) => property === '$transaction'
+      ? async () => { throw failure; } : Reflect.get(target, property) });
+    subtest.mock.method(app.get(PrismaService), 'getClient', () => failingClient);
+    const body = await read(await history(), 500);
+    assert.deepEqual(body, { statusCode: 500, code: 'INTERNAL_ERROR', message: 'Unable to load merchant top-up history.' });
+    assert.ok(!JSON.stringify(body).includes(detail));
+    failure = new ConflictException({ statusCode: 409, code: 'AMOUNT_OUT_OF_RANGE', message: 'Fixture domain error.' });
+    await fail(await history(), 409, 'AMOUNT_OUT_OF_RANGE');
+  });
+
 });
