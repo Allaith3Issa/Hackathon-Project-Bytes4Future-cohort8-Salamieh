@@ -20,8 +20,8 @@ Verified against `allaith-backend` at `d290cd8` and fetched `origin/main` at `ff
 
 | ID | Status | Finding |
 | --- | --- | --- |
-| BE-01 | **Pending** | A successful top-up can fill the available balance to the supported limit while reserves remain locked. Closure then returns `409 AMOUNT_OUT_OF_RANGE` and leaves the reserve locked. Agree on reserve headroom policy before changing financial behavior. |
-| BE-03 | **Pending** | An unexpected failure in admin top-up history can return a sanitized `500` without the shared `INTERNAL_ERROR` code. The [standard error envelope](API_CONTRACT.md#errors) remains the contract. |
+| BE-01 | **Implemented and tested in isolated handoff, awaiting Laith's pull request** | Top-ups lock the merchant wallet and include all positive remaining campaign reserves before crediting. Regression coverage includes exact limits, overflow rollback, expiry, partial settlement, idempotency, and concurrent top-ups, launch, closure and settlement. |
+| BE-03 | **Implemented and tested in isolated handoff, awaiting Laith's pull request** | Admin top-up history returns sanitized `500 INTERNAL_ERROR` for unexpected failures and preserves existing HTTP exceptions. HTTP regression tests inject both cases and retain coverage of pagination, filtering, ordering and legacy nulls. |
 | WEB-02 | **Pending** | When the Web has only a refresh cookie or logout cannot reach the API, Web may clear local cookies while the backend session remains active. The [approved access-JWT logout policy](API_CONTRACT.md#authentication-and-sessions) still applies. |
 | Referral expiry copy | **Pending integration decision** | The API returns `404 NOT_FOUND` for ended or expired offers. Web presents the same missing-link view as for an unknown code. Agree on the message or a separate response contract before changing API behavior. |
 | Step 13D | **Intentionally deferred** | Web callers behind the same Next.js server IP can share an authentication quota. The existing limits remain active. |
