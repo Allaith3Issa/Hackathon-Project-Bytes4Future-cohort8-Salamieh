@@ -494,6 +494,7 @@
     "loadingTheOffer": "جارٍ تحميل العرض…",
     "generatingYourPass": "جارٍ إصدار الرمز…",
     "getDiscountPass": "إصدار بطاقة الخصم",
+    "ownReferralPassBlocked": "لا يمكنك إصدار بطاقة خصم من رابط إحالتك. لتجربة العرض، افتح الرابط وسجّل الدخول بحساب عميل آخر.",
     "showThePassToTheMerchant": "أبرز البطاقة للتاجر عند الدفع نقداً.",
     "yourDiscountPassIsReady": "بطاقة الخصم جاهزة",
     "showTheCodeToTheMerchant": "أبرز الرمز للتاجر عند الدفع نقداً ليُحتسب الخصم و",
