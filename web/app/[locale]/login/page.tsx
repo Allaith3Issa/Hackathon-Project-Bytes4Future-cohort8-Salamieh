@@ -14,11 +14,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ offer?: string; expired?: string }>;
+  searchParams: Promise<{ offer?: string; expired?: string; logout?: string }>;
 }) {
   if (!(await canShowGuestAuthForm())) return <RecoveringSession authPage />;
   const { t } = await getI18n();
-  const { offer, expired } = await searchParams;
+  const { offer, expired, logout } = await searchParams;
   const referral = typeof offer === "string" && validReferral(offer) ? offer : undefined;
   const registerHref = referral ? `/register?offer=${referral}` : "/register";
   return (
@@ -28,6 +28,7 @@ export default async function LoginPage({
       icon={<><rect x="5" y="10" width="14" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2" /></>}
     >
       {expired === "1" && <p className="notice mt-4 border border-rule" role="status">{t("auth.yourSessionHasExpiredPleaseSign")}</p>}
+      {logout === "unconfirmed" && <p className="notice mt-4 border border-rule" role="status">{t("auth.logoutUnconfirmed")}</p>}
       <div className="mt-4"><SignInForm offer={referral} customerOnly={Boolean(referral)} /></div>
       <p className="mt-4 text-center text-sm leading-6 text-muted">
         {t("auth.needAnAccount")}{" "}<Link className="text-link" href={registerHref}>{t("auth.createAccount")}</Link>
