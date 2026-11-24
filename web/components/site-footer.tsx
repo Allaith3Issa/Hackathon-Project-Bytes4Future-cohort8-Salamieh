@@ -27,7 +27,7 @@ export async function SiteFooter() {
   const year = new Intl.NumberFormat(locale === "ar" ? "ar-SY" : "en", { useGrouping: false }).format(new Date().getFullYear());
 
   return (
-    <footer className="bg-ink text-white [&_a:focus-visible]:outline-white">
+    <footer className="footer-lattice bg-ink text-white [&_a:focus-visible]:outline-white">
       <div className="page-wrap">
         <div className="grid gap-x-8 gap-y-5 py-7 sm:grid-cols-2 sm:py-8 md:grid-cols-[1.4fr_1fr_1fr]">
           <div className="sm:col-span-2 md:col-span-1">

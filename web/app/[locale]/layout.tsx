@@ -37,13 +37,12 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
   const { t } = await getI18n();
   const { accessToken, refreshToken } = await sessionTokens();
   const account = accessToken ? await getAccount().catch(() => null) : null;
-  const has = (role: "admin" | "merchant" | "customer") => !account || account.roles.includes(role);
   const link = "inline-flex min-h-11 items-center rounded-lg px-2 font-semibold hover:bg-mauve sm:px-3";
   return (
     <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"}>
       <body className="flex min-h-screen flex-col">
         <I18nProvider locale={locale}>
-        {refreshToken && <SessionRefresh needsRefresh={!accessToken} />}
+        {refreshToken && <SessionRefresh needsRefresh={!account} />}
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-3 focus:z-10 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2">
           {t("navigation.skipToContent")}
         </a>
@@ -52,13 +51,14 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
             <Link href="/" aria-label={t("navigation.home", { value0: t("common.brand") })} className="inline-flex min-h-11 shrink-0 items-center">
               <Image src={mardoodLogo} alt="" sizes="(min-width: 640px) 144px, 112px" className="h-auto w-28 sm:w-36" />
             </Link>
-            <HomeNavigation>
+            <HomeNavigation signedIn={Boolean(account)}>
               <nav aria-label={t("navigation.mainNavigation")} className="flex flex-wrap items-center gap-2 text-sm sm:gap-4 sm:text-base">
-                {accessToken ? (
+                {account ? (
                   <>
-                    {has("customer") && <Link href="/customer" className={link}>{t("common.cashback")}</Link>}
-                    {account?.roles.includes("merchant") && <Link href="/merchant/campaigns" className={link}>{t("navigation.merchantDashboard")}</Link>}
-                    {account?.roles.includes("admin") && <Link href="/admin/topups" className={link}>{t("navigation.admin")}</Link>}
+                    {account.roles.includes("customer") && <Link href="/customer" className={link}>{t("common.cashback")}</Link>}
+                    {account.roles.includes("merchant") && <Link href="/merchant" className={link}>{t("navigation.merchantDashboard")}</Link>}
+                    {account.roles.includes("marketer") && <Link href="/marketer/earnings" className={link}>{t("earnings.marketerTitle")}</Link>}
+                    {account.roles.includes("admin") && <Link href="/admin/revenue" className={link}>{t("navigation.admin")}</Link>}
                     <form action={signOut}><button className="button-secondary" type="submit">{t("navigation.signOut")}</button></form>
                   </>
                 ) : <Link href="/login" className="button-secondary px-3 sm:px-4">{t("common.signIn")}</Link>}

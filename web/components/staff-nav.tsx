@@ -2,10 +2,10 @@ import Link from "@/components/localized-link";
 
 export function StaffNav({ label, items }: { label: string; items: [string, string][] }) {
   return (
-    <div className="border-b border-rule bg-mauve">
-      <nav aria-label={label} className="page-wrap flex flex-wrap gap-1 py-1 text-sm sm:text-base">
+    <div className="staff-strip">
+      <nav aria-label={label} className="page-wrap flex flex-wrap gap-2 py-2 text-sm sm:text-base">
         {items.map(([href, text]) => (
-          <Link key={href} href={href} className="inline-flex min-h-11 items-center rounded-lg px-3 font-semibold hover:bg-white">{text}</Link>
+          <Link key={href} href={href} className="staff-tab">{text}</Link>
         ))}
       </nav>
     </div>

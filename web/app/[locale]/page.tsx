@@ -55,9 +55,9 @@ const passPattern = [
 async function OfferPreview() {
   const { t, formatPercent } = await getI18n();
   return (
-    <figure aria-labelledby="offer-preview-title" className="mx-auto w-full max-w-lg min-w-0 rounded-2xl border border-dusty-mauve/40 bg-mauve/50 p-2.5 sm:p-5 lg:bg-canvas/70">
+    <figure aria-labelledby="offer-preview-title" className="stamp-enter mx-auto w-full max-w-lg min-w-0 rounded-2xl border border-dusty-mauve/40 bg-mauve/50 p-2.5 sm:p-5 lg:bg-canvas/70">
       <figcaption id="offer-preview-title" className="mb-1.5 text-xs font-semibold text-muted sm:mb-2.5 sm:text-sm">{t("home.example")}</figcaption>
-      <div className="overflow-hidden rounded-xl border border-rule bg-white shadow-sm shadow-ink/10">
+      <div className="stamp overflow-hidden">
         <div className="flex items-center gap-3 border-b border-dashed border-rule bg-canvas p-2.5 sm:gap-4 sm:p-5">
           <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg bg-action text-xl leading-none font-bold text-white sm:size-14 sm:text-3xl">{formatPercent(100).match(/[%٪]/)?.[0]}</span>
           <div className="min-w-0">
@@ -99,12 +99,12 @@ export default async function Home() {
     : { href: "/login", label: t("common.signIn") };
   return (
     <>
-      <section className="relative isolate overflow-hidden bg-[linear-gradient(135deg,var(--color-mauve)_0%,var(--color-canvas)_100%)] lg:bg-none">
+      <section className="relative isolate overflow-hidden bg-lattice lg:bg-none">
         <div aria-hidden="true" className="absolute inset-y-0 end-0 -z-10 hidden w-1/2 bg-linear-to-l from-mauve from-70% to-canvas rtl:bg-linear-to-r lg:block" />
         <div className="page-wrap grid items-center gap-4 py-6 sm:gap-6 sm:py-8 md:max-lg:max-w-[44rem] lg:min-h-[25rem] lg:max-w-7xl lg:grid-cols-2 lg:gap-10 lg:py-8 xl:gap-12">
           <div className="min-w-0">
             <h1 className="max-w-xl text-[clamp(1.875rem,8vw,2.625rem)] leading-[1.2] font-bold text-balance md:text-4xl lg:text-[clamp(2.5rem,3.4vw,3rem)]">
-              {beforeCity}<span className="text-action">{t("home.city")}</span>{punctuation}<span className="lg:block">{afterCity}</span>
+              {beforeCity}<span className="heading-highlight text-action">{t("home.city")}</span>{punctuation}<span className="lg:block">{afterCity}</span>
             </h1>
             <p className="mt-3 max-w-md leading-7 text-pretty text-muted sm:text-lg sm:leading-8 lg:max-w-[25rem]">
               {t("home.openTheOfferLinkAndShow")}
@@ -139,7 +139,7 @@ export default async function Home() {
         <h2 id="benefits-title" className="text-xl leading-tight font-bold sm:text-2xl">{t("home.whyChooseMardood")}</h2>
         <ul role="list" className="mt-4 grid gap-3 md:grid-cols-3 md:gap-4">
           {benefits.map(({ title, detail, icon }) => (
-            <li key={title} className="surface grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 p-4">
+            <li key={title} className="stamp grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3 p-4">
               <span aria-hidden="true" className="grid size-9 place-items-center rounded-lg bg-mauve text-ink">
                 <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d={icon} />

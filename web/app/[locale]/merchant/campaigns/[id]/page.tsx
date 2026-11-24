@@ -4,10 +4,11 @@ import type { Metadata } from "next";
 import Link from "@/components/localized-link";
 import { notFound } from "next/navigation";
 import { CloseCampaign } from "@/components/close-campaign";
+import { RecoveringSession } from "@/components/recovering-session";
 import { ApiError } from "@/lib/api";
 import { authenticatedRequest } from "@/lib/session";
-import { expiredRedirect, requireRole } from "@/lib/staff";
-import type { MerchantCampaign } from "@/lib/staff-contract";
+import { expiredRedirect, requirePageRole } from "@/lib/staff";
+import type { MerchantCampaign, MerchantWallet, MerchantWalletTransaction, Page } from "@/lib/staff-contract";
 import { staffError, statusLabels } from "@/lib/staff-ui";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -16,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function CampaignPage({ params }: { params: Promise<{ id: string }> }) {
   const { t, locale, formatNumber, formatSyp: formatMoney, formatDate } = await getI18n();
-  await requireRole("merchant");
+  if (!(await requirePageRole("merchant"))) return <RecoveringSession />;
   const { id } = await params;
   if (!/^[0-9a-f-]{8,64}$/i.test(id)) notFound();
   let c: MerchantCampaign;
@@ -60,9 +61,41 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       </dl>
       <section className="surface grid gap-3 p-5 sm:p-6" aria-labelledby="close-title">
         <h2 id="close-title" className="text-xl font-bold">{t("campaigns.closeCampaign")}</h2>
-        {c.status === "ended" ? <p className="notice">{t("campaigns.thisCampaignHasEndedAndThe")}</p> : <CloseCampaign id={c.id} />}
+        {c.status === "ended" ? <ClosedCampaignDetails id={c.id} /> : <CloseCampaign id={c.id} />}
       </section>
       <Link href="/merchant/campaigns" className="text-link">{t("campaigns.allCampaigns")}</Link>
     </div>
+  );
+}
+
+async function ClosedCampaignDetails({ id }: { id: string }) {
+  const { t, formatSyp } = await getI18n();
+  const [wallet, ledger] = await Promise.allSettled([
+    authenticatedRequest<MerchantWallet>("/merchant/wallet"),
+    authenticatedRequest<Page<MerchantWalletTransaction>>("/merchant/wallet/transactions"),
+  ]);
+  const release = ledger.status === "fulfilled"
+    ? ledger.value.items.find((line) => line.kind === "campaign_reserve_unlock" && line.campaignId === id)
+    : undefined;
+
+  return (
+    <>
+      <p className="notice">{t("campaigns.thisCampaignHasEndedAndThe")}</p>
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-sm text-muted">{t("earnings.availableBalance")}</dt>
+          <dd className="font-semibold tabular-nums">
+            {wallet.status === "fulfilled" ? <bdi>{formatSyp(wallet.value.availableBalanceSyp)}</bdi> : t("merchantReporting.walletUnavailable")}
+          </dd>
+        </div>
+        {release && (
+          <div>
+            <dt className="text-sm text-muted">{t("merchantReporting.reserveReleased")}</dt>
+            <dd className="font-semibold tabular-nums"><bdi>{formatSyp(release.amountSyp)}</bdi></dd>
+          </div>
+        )}
+      </dl>
+      <Link className="text-link" href="/merchant/wallet#wallet-history">{t("merchantReporting.walletHistory")}</Link>
+    </>
   );
 }

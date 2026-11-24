@@ -2,10 +2,51 @@ import type { Account } from "./contract";
 export type { Page } from "./contract";
 
 export interface MerchantWallet { availableBalanceSyp: number; totalLockedReservesSyp: number; creditLimitSyp: number }
+export interface MerchantDashboard {
+  verificationStatus: MerchantVerificationStatus;
+  wallet: MerchantWallet;
+  activeCampaignsCount: number;
+  topCampaign: { campaignId: string; productName: string; grossCashSalesSyp: number; salesCount: number } | null;
+  stats: {
+    clicks: number;
+    salesCount: number;
+    itemsSold: number;
+    grossCashSalesSyp: number;
+    commissionPaidSyp: number;
+    platformFeesPaidSyp: number;
+    conversionRatePercent: number;
+  };
+}
+export interface MerchantWalletTransaction {
+  id: string;
+  kind: "merchant_topup" | "campaign_reserve_lock" | "campaign_reserve_unlock" | "sale_reserve_debit" | "cashback_voucher_merchant_credit";
+  amountSyp: number;
+  campaignId: string | null;
+  campaignName: string | null;
+  referenceNote: string | null;
+  createdAt: string;
+}
+export interface MarketerWallet {
+  availableBalanceSyp: number;
+  pendingPayoutSyp: number;
+  totalEarnedSyp: number;
+  totalConfirmedPaidOutSyp: number;
+}
+export interface AdminRevenueSummary { netPlatformFeesSyp: number; totalMarketerCommissionSyp: number }
+export interface AdminMarketerEarnings {
+  id: string;
+  name: string;
+  phone: string;
+  salesCount: number;
+  totalEarnedSyp: number;
+}
 export interface AdminMerchant {
   id: string; name: string; phone: string; roles: Account["roles"]; createdAt: string;
   merchant: NonNullable<Account["merchant"]>; wallet: MerchantWallet;
 }
+export const merchantVerificationStatuses = ["pending", "verified", "rejected"] as const;
+export type MerchantVerificationStatus = (typeof merchantVerificationStatuses)[number];
+export type MerchantVerificationDecision = Exclude<MerchantVerificationStatus, "pending">;
 export type PaymentMethod = "cash" | "sham_cash" | "syriatel_cash" | "bank_transfer";
 export interface AdminTopupResult {
   topupId: string; merchantId: string; shopName: string; amountSyp: number; paymentMethod: PaymentMethod;
