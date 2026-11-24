@@ -24,10 +24,12 @@ export async function sessionTokens() {
   };
 }
 
-export async function saveSession(session: AuthSession) {
+export async function saveSession(session: AuthSession, canSave?: () => boolean) {
   const jar = await cookies();
+  if (canSave && !canSave()) return false;
   jar.set(accessCookie, session.accessToken, { ...cookieOptions, maxAge: session.expiresInSeconds });
   jar.set(refreshCookie, session.refreshToken, { ...cookieOptions, maxAge: 2592000 });
+  return true;
 }
 
 export async function clearSession() {

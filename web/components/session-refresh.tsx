@@ -1,9 +1,26 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useTransition, type FormEvent } from "react";
 
 const recoveryEvent = "mardood-session-recovery";
+const sessionLock = "affiliate-session-refresh";
+
+export function SessionSignOut({ signOutAction, label }: { signOutAction: () => Promise<never>; label: string }) {
+  const [pending, startTransition] = useTransition();
+  function submit(event: FormEvent<HTMLFormElement>) {
+    if (!navigator.locks) return;
+    event.preventDefault();
+    if (!pending) startTransition(async () => {
+      await navigator.locks.request(sessionLock, async () => { await signOutAction(); });
+    });
+  }
+  return (
+    <form action={signOutAction} onSubmit={submit}>
+      <button className="button-secondary" type="submit" disabled={pending}>{label}</button>
+    </form>
+  );
+}
 
 export function RequestSessionRecovery() {
   useEffect(() => {
@@ -25,15 +42,14 @@ export function SessionRefresh({ needsRefresh }: { needsRefresh: boolean }) {
       pending = true;
       try {
         const run = async () => {
-          const response = await fetch("/session/refresh", { method: "POST" });
+          const response = await fetch("/session/refresh", { method: "POST", signal: AbortSignal.timeout(15000) });
           if (active && (response.status === 401 || (refreshView && response.ok))) router.refresh();
         };
         if (navigator.locks) {
-          const lockName = "affiliate-session-refresh";
-          await navigator.locks.request(lockName, { ifAvailable: true }, async (lock) => {
+          await navigator.locks.request(sessionLock, { ifAvailable: true }, async (lock) => {
             if (lock) await run();
             else if (refreshView) {
-              await navigator.locks.request(lockName, () => {
+              await navigator.locks.request(sessionLock, () => {
                 if (active) router.refresh();
               });
             }
