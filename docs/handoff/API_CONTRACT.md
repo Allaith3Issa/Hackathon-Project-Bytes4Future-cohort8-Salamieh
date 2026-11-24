@@ -6,6 +6,8 @@
 
 This contract aligns with [DATABASE_ERD.md](DATABASE_ERD.md) and [Affiliate Marketing Platform.md](Affiliate%20Marketing%20Platform.md). The NestJS implementation must publish the same routes, request/response schemas, status codes, and errors in Swagger. All routes below are relative to `/api/v1`.
 
+Endpoint groups identify any planned routes. See [implementation status](IMPLEMENTATION_STATUS.md) for tested workflows and known discrepancies.
+
 ## Conventions
 
 - Use JSON and camelCase. IDs are UUID strings unless noted. Timestamps use UTC ISO 8601. Phone numbers match `^09[0-9]{8}$`. Monetary fields ending in `Syp` carry nonnegative JSON integers in minor units of the new Syrian Pound. Existing field names and JSON types are retained for MVP client compatibility. See [Monetary limits and precision](#monetary-limits-and-precision).
@@ -35,16 +37,27 @@ Validation errors may include `fieldErrors: Record<string, string[]>`. Scoped pr
 | `409` | `AMOUNT_OUT_OF_RANGE`, `PHONE_ALREADY_REGISTERED`, `CAMPAIGN_ENDED`, `CAMPAIGN_LIMIT_EXCEEDED`, `INSUFFICIENT_MERCHANT_BALANCE`, `INSUFFICIENT_LOCKED_BUDGET`, `INSUFFICIENT_CASHBACK_BALANCE`, `INSUFFICIENT_WALLET_BALANCE`, `JOIN_REQUEST_PENDING`, `INVALID_STATUS_TRANSITION`, `QR_ALREADY_REDEEMED`, `QR_EXPIRED`, `VOUCHER_EXCEEDS_BILL`, `IDEMPOTENCY_KEY_REUSED` |
 | `429` | `RATE_LIMITED` |
 | `500` | `INTERNAL_ERROR` |
+| `503` | `DATABASE_UNAVAILABLE` |
+
+## Service readiness
+
+| Method and path | Access | Request | Responses |
+| --- | --- | --- | --- |
+| `GET /health` | Public | None | `200 { "status": "ok" }` or `503 DATABASE_UNAVAILABLE` |
+
+This implemented operational endpoint at `/api/v1/health` checks PostgreSQL connectivity with a 2.5-second deadline and returns `Cache-Control: no-store`. The error response uses the standard envelope and omits connection details.
 
 ## Authentication and sessions
+
+All routes in this section are implemented. Public registration is an implemented extension to the seeded-account demo.
 
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
 | `POST /auth/register` | Public | `{ name, phone, password, roles, shop? }`. `roles` is a nonempty distinct array from `["customer", "marketer", "merchant"]`. `shop: { name, details }` is required when `"merchant"` is included. | `201 AuthSession` |
 | `POST /auth/login` | Public | `{ phone, password }` | `200 AuthSession` |
 | `POST /auth/admin/login` | Public | `{ phone, password }` (admin accounts only; returns `401 INVALID_CREDENTIALS` for non-admin) | `200 AuthSession` |
-| `POST /auth/refresh` | Public | `{ refreshToken }` (rotates refresh token; rejects reuse and 30-day inactive sessions) | `200 AuthSession` |
-| `POST /auth/logout` | Signed in | `{ refreshToken? }` | `204 No Content` |
+| `POST /auth/refresh` | Refresh token | `{ refreshToken }` | `200 AuthSession` |
+| `POST /auth/logout` | Valid access JWT for the session | `{ refreshToken? }` | `204 No Content` |
 | `GET /auth/me` | Signed in | None | `200 Account` |
 
 ```ts
@@ -78,9 +91,15 @@ type AuthSession = {
 };
 ```
 
-Web (`web/`) stores `accessToken` and `refreshToken` inside server-managed `HttpOnly` cookies via a Next.js session boundary. React Native (Expo) stores them in Secure Storage and sends `Authorization: Bearer <accessToken>`.
+Web (`web/`) stores `accessToken` and `refreshToken` in server-managed `HttpOnly` cookies via a Next.js session boundary. Expo clients should use Secure Storage and send `Authorization: Bearer <accessToken>` on protected requests.
+
+Access JWTs last 30 minutes (`expiresInSeconds: 1800`). Database sessions expire 30 days after creation, including admin sessions. Successful refresh rotates the opaque token and replaces its stored hash without changing expiry or the activity timestamp. The previous token cannot be reused. Logout revokes the session identified by the valid access JWT. If a refresh token is supplied, it must match the token currently bound to that session. Web logout with only a refresh cookie remains pending under [WEB-02](IMPLEMENTATION_STATUS.md#pending-and-deferred-audit-items).
+
+Public accounts can hold multiple public roles. Public registration cannot assign `admin`. Provision the first admin manually with the [bootstrap CLI](../../api/ADMIN_BOOTSTRAP.md) after migrations. NestJS verifies the session, current roles, and relevant ownership independently of client navigation.
 
 ## Campaigns and participation
+
+The MVP implements product campaign preview and launch with fixed commission and open joining, plus campaign listing, detail, closure, and marketer membership reads. Both `/participants` routes below describe deferred approval workflows. Store-discount types and related request shapes are retained for the deferred extension.
 
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
@@ -186,6 +205,8 @@ type MerchantParticipant = Membership & { marketerId: string; name: string; stat
 
 ## Public offers, Customer QR passes & Cashback
 
+Public offer resolution and click tracking, Offer QR issuance, and customer cashback and purchase reporting are implemented. The three `/customer/cashback-vouchers` operations are the deferred first extension. The API can resolve a persisted direct referral code. Merchant-facing direct link creation and management are deferred. Public offer reads currently return `404 NOT_FOUND` for ended or expired offers as well as unknown codes. See [open integration items](IMPLEMENTATION_STATUS.md#pending-and-deferred-audit-items).
+
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
 | `GET /public/referrals/{code}` | Public | None (works for both marketer `referral_code` and `direct_referral_code`) | `200 PublicOffer` |
@@ -262,6 +283,8 @@ type CashbackVoucher = {
 ```
 
 ## Merchant QR scanner & Wallet
+
+Current scanner lookup and redemption support Offer QRs only. Voucher lookup and redemption, store-discount preview, and store-discount checkout are deferred. Merchant wallet, transaction history, and dashboard reads are implemented extra endpoints.
 
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
@@ -359,6 +382,8 @@ type StoreDiscountPreview = {
 
 ## Marketer wallet, per-merchant breakdown, payouts & stats
 
+The marketer wallet balance supports the MVP. Per-merchant earnings, transaction history, and stats are implemented extra endpoints. All payout routes and `/public/leaderboard` are deferred.
+
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
 | `GET /marketer/wallet` | Marketer | None | `200 MarketerWallet` |
@@ -445,6 +470,8 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 ```
 
 ## Administration
+
+Merchant top-up supports the MVP. Merchant verification, top-up history, and the three `/admin/revenue` reads are implemented extra endpoints. Admin payout operations and `/admin/users`, `/admin/campaigns`, and `/admin/overview` are deferred. Admin revenue and the broader overview are separate reports.
 
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
@@ -557,7 +584,7 @@ All monetary operands and results below are integer minor units. Percentages, it
    - `marketerCommissionSyp = 0` for `merchant_direct`, else `commissionPerItemSyp × quantity` (`fixed`) or `floor(customerPaidCashSyp × commission.percent / 100)` (`percentage`).
    - `totalDeductedReserveSyp = marketerCommissionSyp + platformTotalFeeSyp`.
 4. Campaign creation checks `merchant.availableBalanceSyp >= worstCaseReserveSyp` under the merchant wallet lock. Commit the new campaign, reserve transfer, ledger movement and saved launch response together. Every scan checks `campaign.lockedBudgetSyp >= totalDeductedReserveSyp` under a row lock.
-5. Customer cashback unlocks from `lockedCashbackSyp` to `availableCashbackSyp` when `milestonePurchaseCount >= 5` and `milestoneSpendSyp >= 50000` (500.00 new SYP). Both thresholds are configurable. Cashback is backed by the 2% pool collected inside `platformTotalFeeSyp`.
+5. Customer cashback unlocks from `lockedCashbackSyp` to `availableCashbackSyp` when both configured thresholds are reached. The defaults are `milestonePurchaseCount >= 5` and `milestoneSpendSyp >= 50000` (500.00 new SYP). Optional overrides `CASHBACK_MILESTONE_PURCHASES` and `CASHBACK_MILESTONE_SPEND_SYP` are validated before the HTTP server starts in every environment. Cashback is backed by the 2% pool collected inside `platformTotalFeeSyp`.
 6. Conversion rate = `(itemsSold / clicks) × 100` rounded to 2 decimals (`0` when `clicks === 0`).
 
 
@@ -596,7 +623,7 @@ The JSON examples and fixture amounts use minor units. For example, the scanner'
 | --- | --- |
 | Live rehearsal | Seed an admin, a verified merchant with 100000 minor units available, a marketer and a customer. Start without the live rehearsal campaign. The team creates it after the top-up, joins it from Expo, and issues its pass through the web flow. |
 | Scanner development | Use an independent seed or database reset with a funded, active product campaign, approved marketer membership, customer and active Offer QR code `OF-DEMO01`. The campaign owner can preview and redeem this code while live QR issuance is being built. Use the same final price of 90000, commission of 10000 and 30-item cap as the live rehearsal, with 435000 already reserved and zero sales. |
-| Voucher extension | Seed four settled purchases of 40000 each for the customer in the current milestone cycle. The customer starts at 4 purchases, 160000 of cycle spend and 3200 of locked cashback. The sale of 90000 adds 1800, so the fifth purchase unlocks 5000. Seed a second verified merchant to accept the voucher. Use a separate reset for the voucher integration tests that start with 10000 available. |
+| Voucher extension (planned fixture) | Seed four settled purchases of 40000 each for the customer in the current milestone cycle. The customer starts at 4 purchases, 160000 of cycle spend and 3200 of locked cashback. The sale of 90000 adds 1800, so the fifth purchase unlocks 5000. Seed a second verified merchant to accept the voucher. Use a separate fresh test database for voucher integration tests that start with 10000 available. |
 
 The live rehearsal starts with admin top-up, then merchant preview and launch. The marketer calls `POST /marketer/campaigns/{campaignId}/join` with no body and shares the returned `referralUrl`. The web opens `/r/[code]` and calls `GET /public/referrals/{code}` for offer details. The signed-in customer calls `POST /customer/referrals/{code}/offer-qr` with no body. Use the returned `passCode` for merchant lookup and redemption. After settlement, refresh `GET /marketer/wallet` and `GET /customer/dashboard` before closing the campaign.
 

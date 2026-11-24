@@ -2,7 +2,7 @@
 
 By default, use a dedicated local PostgreSQL database, such as `affiliate_marketing_demo`. The seed accepts loopback hosts and database names starting with `affiliate_marketing_demo` or `affiliate_marketing_seed_test`, with optional underscore-separated suffixes. This mode rejects the database named by `DATABASE_URL` and requires `NODE_ENV=development` or `NODE_ENV=test`.
 
-From `api/`, run `npx --no prisma migrate deploy` with a process-scoped `DATABASE_URL` pointed at the dedicated database. Then restore the normal `DATABASE_URL` or use a new shell. For seeding, set `DEMO_SEED_DATABASE_URL` to the dedicated database URL without query options. Set distinct `DEMO_ADMIN_PASSWORD` and `DEMO_ACCOUNT_PASSWORD` values of at least 12 characters and at most 72 UTF-8 bytes privately in the environment or ignored `.env`. The second password applies to all six non-admin accounts.
+From `api/`, run `npx --no prisma migrate deploy --config prisma7.config.ts` with a process-scoped `DATABASE_URL` pointed at the dedicated database. Then restore the normal `DATABASE_URL` or use a new shell. For seeding, set `DEMO_SEED_DATABASE_URL` to the dedicated database URL without query options. Set distinct `DEMO_ADMIN_PASSWORD` and `DEMO_ACCOUNT_PASSWORD` values of at least 12 characters and at most 72 UTF-8 bytes privately in the environment or ignored `.env`. The second password applies to all six non-admin accounts.
 
 ```powershell
 $env:NODE_ENV = 'development'
