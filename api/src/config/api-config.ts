@@ -1,9 +1,11 @@
 import { ApiConfigurationError, validateDatabaseConfig } from '../prisma/database-config';
 import { parseCashbackThresholds } from './cashback-thresholds';
+import { readImageKitConfig } from './imagekit-config';
 
 export function validateApiConfig(config: Record<string, unknown>) {
   validateDatabaseConfig(config);
   parseCashbackThresholds(config.CASHBACK_MILESTONE_PURCHASES, config.CASHBACK_MILESTONE_SPEND_SYP);
+  readImageKitConfig(config.IMAGEKIT_PRIVATE_KEY, config.IMAGEKIT_URL_ENDPOINT);
   if (config.NODE_ENV !== 'production') return config;
 
   const secret = config.JWT_SECRET;
