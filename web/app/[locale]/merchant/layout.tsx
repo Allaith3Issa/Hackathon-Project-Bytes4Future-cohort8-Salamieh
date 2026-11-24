@@ -9,7 +9,13 @@ export default async function MerchantLayout({ children }: { children: React.Rea
   return (
     <>
       {merchant && (
-        <StaffNav label={t("navigation.merchantNavigation")} items={[["/merchant/campaigns/new", t("campaigns.newCampaign")], ["/merchant/campaigns", t("campaigns.myCampaigns")], ["/merchant/scanner", t("navigation.scanner")]]} />
+        <StaffNav label={t("navigation.merchantNavigation")} items={[
+          ["/merchant", t("navigation.merchantDashboard")],
+          ["/merchant/wallet", t("merchantReporting.wallet")],
+          ["/merchant/campaigns", t("campaigns.myCampaigns")],
+          ["/merchant/campaigns/new", t("campaigns.newCampaign")],
+          ["/merchant/scanner", t("navigation.scanner")],
+        ]} />
       )}
       {merchant && merchant.verificationStatus !== "verified" && (
         <div className="page-wrap pt-4"><p role="status" className="notice">{t("navigation.yourStoreIsAwaitingVerificationOnce")}</p></div>

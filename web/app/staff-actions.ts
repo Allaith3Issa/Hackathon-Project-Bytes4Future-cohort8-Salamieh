@@ -174,6 +174,7 @@ export async function closeCampaign(id: string, _state: CloseState): Promise<Clo
   try {
     const campaign = await authenticatedRequest<MerchantCampaign>(`${path}/close`, { method: "POST" });
     revalidatePath(localizedPath(path, locale, true));
+    revalidatePath(localizedPath("/merchant", locale, true), "layout");
     return { campaign };
   } catch (error) {
     return { error: staffError(error, t) };
@@ -193,15 +194,38 @@ export async function lookupOffer(code: string): Promise<{ lookup?: ScannerLooku
   }
 }
 
-export async function redeemOffer(code: string, key: string): Promise<{ result?: OfferRedeemResult; error?: string; terminal?: boolean }> {
-  await requireRole("merchant");
+const offerSettlementRejections = new Set([
+  "QR_EXPIRED", "CAMPAIGN_ENDED", "CAMPAIGN_LIMIT_EXCEEDED", "INSUFFICIENT_LOCKED_BUDGET", "AMOUNT_OUT_OF_RANGE",
+]);
+
+export async function redeemOffer(merchantId: string, code: string, key: string): Promise<
+  { result: OfferRedeemResult } | { error: string; outcome: "rejected" | "already_redeemed" | "uncertain" }
+> {
+  const account = await requireRole("merchant");
   const { t } = await getI18n();
-  if (!uuid.test(key)) return { error: t(KEY_ERROR), terminal: true };
+  if (account.id !== merchantId) {
+    return { error: t("errors.youDonTHavePermissionTo"), outcome: "uncertain" };
+  }
+  if (!uuid.test(key)) return { error: t(KEY_ERROR), outcome: "uncertain" };
   try {
-    return { result: await authenticatedRequest<OfferRedeemResult>("/merchant/scanner/redeem-offer", { method: "POST", idempotencyKey: key, body: { code: code.trim() } }) };
+    const result = await authenticatedRequest<OfferRedeemResult>("/merchant/scanner/redeem-offer", {
+      method: "POST", idempotencyKey: key, body: { code: code.trim() },
+    });
+    if (!result || typeof result.saleId !== "string" || !uuid.test(result.saleId)) {
+      return { error: t("scanner.offerResultUnconfirmed"), outcome: "uncertain" };
+    }
+    return { result };
   } catch (error) {
-    const uncertain = error instanceof ApiError && (error.status >= 500 || error.code === "RATE_LIMITED");
-    return { error: staffError(error, t), terminal: !uncertain };
+    const message = staffError(error, t);
+    // Nest replays committed results before running settlement. Only its explicit
+    // settlement conflicts establish a terminal outcome. Other responses can occur before replay.
+    if (error instanceof ApiError && error.status === 409) {
+      if (error.code === "QR_ALREADY_REDEEMED") return { error: message, outcome: "already_redeemed" };
+      if (offerSettlementRejections.has(error.code)) {
+        return { error: message, outcome: "rejected" };
+      }
+    }
+    return { error: message, outcome: "uncertain" };
   }
 }
 

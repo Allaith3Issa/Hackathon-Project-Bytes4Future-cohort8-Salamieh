@@ -6,14 +6,15 @@ import { lookupOffer, redeemOffer, redeemVoucher } from "@/app/staff-actions";
 import { fieldClass, parsePositiveMoney, statusLabels } from "@/lib/staff-ui";
 import type { OfferRedeemResult, ScannerLookup, VoucherRedeemResult } from "@/lib/staff-contract";
 import { Field } from "./field";
-import { useAttemptKey } from "./use-attempt-key";
 
 type Offer = Extract<ScannerLookup, { kind: "offer_qr" }>;
 type Voucher = { amountSyp: number; customerName?: string };
 type VoucherAttempt = { code: string; bill: string; key: string; amountSyp: number };
+type OfferAttempt = { code: string; key: string };
 type Phase =
   | { step: "input" }
   | { step: "offer"; offer: Offer }
+  | { step: "offer-recovery"; attempt: OfferAttempt }
   | { step: "voucher"; voucher: Voucher }
   | { step: "offer-done"; result: OfferRedeemResult }
   | { step: "voucher-done"; result: VoucherRedeemResult };
@@ -21,6 +22,19 @@ type Phase =
 const subscribe = () => () => {};
 const restoredMessage = "scanner.theLastRedemptionHasnTBeen";
 const storageError = "scanner.weCouldnTSaveTheRedemption";
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function readOfferAttempt(storageKey: string): OfferAttempt | null {
+  try {
+    const saved: Partial<OfferAttempt> | null = JSON.parse(sessionStorage.getItem(storageKey) ?? "null");
+    const code = typeof saved?.code === "string" ? saved.code.trim() : "";
+    return code && code.length <= 200 && typeof saved?.key === "string" && uuid.test(saved.key)
+      ? { code, key: saved.key }
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 function readAttempt(storageKey: string): VoucherAttempt | null {
   try {
@@ -36,7 +50,7 @@ function readAttempt(storageKey: string): VoucherAttempt | null {
   }
 }
 
-function saveAttempt(storageKey: string, attempt: VoucherAttempt) {
+function saveAttempt(storageKey: string, attempt: VoucherAttempt | OfferAttempt) {
   try {
     sessionStorage.setItem(storageKey, JSON.stringify(attempt));
     return true;
@@ -72,39 +86,83 @@ export function ScannerFlow({ merchantId }: { merchantId: string }) {
   const hydrated = useSyncExternalStore(subscribe, () => true, () => false);
   if (!hydrated) return <p role="status" className="notice">{t("scanner.preparingTheScanner")}</p>;
 
-  return <Scanner storageKey={`mardood-pending-voucher:${merchantId}`} />;
+  return <Scanner merchantId={merchantId} />;
 }
 
-function Scanner({ storageKey }: { storageKey: string }) {
+function Scanner({ merchantId }: { merchantId: string }) {
+  const storageKey = `mardood-pending-voucher:${merchantId}`;
+  const offerKey = `mardood-pending-offer:${merchantId}`;
   const { t, formatSyp: formatMoney } = useI18n();
   const id = useId();
   const [attempt, setAttempt] = useState(() => readAttempt(storageKey));
   const [code, setCode] = useState(attempt?.code ?? "");
   const [bill, setBill] = useState(attempt?.bill ?? "");
-  const [phase, setPhase] = useState<Phase>(attempt ? { step: "voucher", voucher: { amountSyp: attempt.amountSyp } } : { step: "input" });
-  const [error, setError] = useState<string | undefined>(attempt ? t(restoredMessage) : undefined);
+  const [phase, setPhase] = useState<Phase>(() => {
+    const savedOffer = readOfferAttempt(offerKey);
+    if (savedOffer) return { step: "offer-recovery", attempt: savedOffer };
+    return attempt ? { step: "voucher", voucher: { amountSyp: attempt.amountSyp } } : { step: "input" };
+  });
+  const [error, setError] = useState<string | undefined>(phase.step === "voucher" ? t(restoredMessage) : undefined);
   const [pending, start] = useTransition();
-  const [key, renewKey] = useAttemptKey();
+  const offerInFlight = useRef(false);
   const voucherInFlight = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const alert = useRef<HTMLParagraphElement>(null);
   useEffect(() => { heading.current?.focus(); }, [phase.step]);
   useEffect(() => { if (error) alert.current?.focus(); }, [error]);
-  const reset = () => { setCode(""); setBill(""); setError(undefined); setPhase({ step: "input" }); };
+  const reset = () => {
+    setError(attempt ? t(restoredMessage) : undefined);
+    setCode(attempt?.code ?? "");
+    setBill(attempt?.bill ?? "");
+    setPhase(attempt ? { step: "voucher", voucher: { amountSyp: attempt.amountSyp } } : { step: "input" });
+  };
   const lookup = () => start(async () => {
     setError(undefined);
     const r = await lookupOffer(code);
     if (r.error || !r.lookup) return setError(r.error);
-    if (r.lookup.kind === "offer_qr") renewKey();
     setPhase(r.lookup.kind === "offer_qr" ? { step: "offer", offer: r.lookup } : { step: "voucher", voucher: r.lookup });
   });
-  const redeem = () => start(async () => {
+  const redeem = () => {
+    if (offerInFlight.current || pending) return;
+    const saved = readOfferAttempt(offerKey);
+    if (phase.step !== "offer-recovery" && saved) {
+      setPhase({ step: "offer-recovery", attempt: saved });
+      return;
+    }
+    const submitted = phase.step === "offer-recovery" ? phase.attempt : { code: code.trim(), key: crypto.randomUUID() };
+    if (!saveAttempt(offerKey, submitted)) {
+      setError(t(storageError));
+      return;
+    }
+    offerInFlight.current = true;
     setError(undefined);
-    const r = await redeemOffer(code, key);
-    if (r.result) return setPhase({ step: "offer-done", result: r.result });
-    setError(r.error);
-    if (r.terminal) setPhase({ step: "input" });
-  });
+    start(async () => {
+      try {
+        const r = await redeemOffer(merchantId, submitted.code, submitted.key);
+        if ("outcome" in r && r.outcome === "uncertain") {
+          setPhase({ step: "offer-recovery", attempt: submitted });
+          setError(r.error);
+          return;
+        }
+        try {
+          if (readOfferAttempt(offerKey)?.key === submitted.key) sessionStorage.removeItem(offerKey);
+        } catch {
+          // A saved attempt can still be retried safely with its original key.
+        }
+        if ("result" in r) {
+          setPhase({ step: "offer-done", result: r.result });
+        } else {
+          reset();
+          setError(r.error);
+        }
+      } catch {
+        setPhase({ step: "offer-recovery", attempt: submitted });
+        setError(t("scanner.offerResultUnconfirmed"));
+      } finally {
+        offerInFlight.current = false;
+      }
+    });
+  };
   const redeemV = (voucher: Voucher) => {
     if (voucherInFlight.current || pending || parsePositiveMoney(bill) === null) return;
     const submitted = attempt ?? { code: code.trim(), bill, key: crypto.randomUUID(), amountSyp: voucher.amountSyp };
@@ -136,6 +194,19 @@ function Scanner({ storageKey }: { storageKey: string }) {
     });
   };
   const alertEl = error && <p ref={alert} tabIndex={-1} role="alert" className="notice-error">{error}</p>;
+
+  if (phase.step === "offer-recovery") {
+    return (
+      <section className="surface grid gap-4 p-5 sm:p-6">
+        <h2 ref={heading} tabIndex={-1} className="text-xl font-bold">{t("scanner.pendingOfferSale")}</h2>
+        <p className="notice">{t("scanner.offerResultUnconfirmed")}</p>
+        {error && error !== t("scanner.offerResultUnconfirmed") && alertEl}
+        <button type="button" className="button-primary w-fit" disabled={pending} onClick={redeem}>
+          {pending ? t("scanner.confirming") : t("scanner.retryOriginalOffer")}
+        </button>
+      </section>
+    );
+  }
 
   if (phase.step === "offer-done") {
     const r = phase.result;
@@ -214,7 +285,7 @@ function Scanner({ storageKey }: { storageKey: string }) {
         <p className="text-sm text-muted">{t("scanner.collectTheCashBeforeConfirmingEach")}</p>
         {alertEl}
         <div className="flex flex-wrap gap-3">
-          <button type="button" className="button-primary" disabled={pending || !key} onClick={redeem}>
+          <button type="button" className="button-primary" disabled={pending} onClick={redeem}>
             {pending ? t("scanner.confirming") : error ? t("common.tryAgain") : t("scanner.confirmCashReceived")}
           </button>
           <button type="button" className="button-secondary" disabled={pending} onClick={reset}>{t("common.cancel")}</button>

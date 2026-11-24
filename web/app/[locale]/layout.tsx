@@ -60,7 +60,7 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
                 {account ? (
                   <>
                     {account.roles.includes("customer") && <Link href="/customer" className={link}>{t("common.cashback")}</Link>}
-                    {account.roles.includes("merchant") && <Link href="/merchant/campaigns" className={link}>{t("navigation.merchantDashboard")}</Link>}
+                    {account.roles.includes("merchant") && <Link href="/merchant" className={link}>{t("navigation.merchantDashboard")}</Link>}
                     {account.roles.includes("marketer") && <Link href="/marketer/earnings" className={link}>{t("earnings.marketerTitle")}</Link>}
                     {account.roles.includes("admin") && <Link href="/admin/revenue" className={link}>{t("navigation.admin")}</Link>}
                     {signOutForm}
