@@ -36,7 +36,7 @@ export function LanguageSwitcher() {
                 window.dispatchEvent(new CustomEvent(languageSwitchEvent, { detail: item }));
               }
             }}
-            className="grid min-h-9 place-items-center rounded-md px-2 font-semibold text-muted hover:text-action hover:underline">{title}</a>
+            className="grid min-h-9 place-items-center rounded-md px-2 font-semibold text-muted hover:text-ink hover:underline">{title}</a>
         );
       })}
     </nav>

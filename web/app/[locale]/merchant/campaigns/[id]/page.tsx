@@ -46,7 +46,7 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <h1 className="page-title">{c.productName}</h1>
         <p className="mt-1 text-muted">{t(statusLabels[c.status])}{" "}{t("campaigns.ends2")}{" "}{formatDate(c.endsAt)}</p>
       </div>
-      <dl className="grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
+      <dl className="stamp-depth grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-ink p-5 text-white sm:p-7">
           <dt className="text-sm font-semibold">{t("campaigns.currentLockedReserve")}</dt>
           <dd className="mt-3 text-3xl font-bold tabular-nums sm:text-4xl">{formatMoney(u.lockedBudgetSyp)}</dd>

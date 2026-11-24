@@ -3,5 +3,5 @@
 }
 
 .page {
-  background: linear-gradient(135deg, var(--color-mauve) 0%, var(--color-canvas) 100%);
+  background: var(--star-tile) 0 0 / 84px 84px, linear-gradient(135deg, var(--color-mauve), var(--color-canvas));
 }

@@ -55,31 +55,33 @@ export default async function OfferPage({ params }: { params: Promise<{ code: st
     <div className="page-wrap py-7 sm:py-12">
       <OfferVisit code={code} />
       <article className="grid items-start gap-5 md:max-lg:mx-auto md:max-lg:max-w-[600px] lg:grid-cols-[0.95fr_1.05fr] lg:gap-x-12 lg:gap-y-6">
-        <div className="space-y-4 lg:col-start-1 lg:row-start-1">
-          <header>
-            <p className="text-sm font-bold text-action">{offer.shopName}</p>
-            <h1 className="mt-2 text-[clamp(2rem,4vw,3.5rem)] leading-[1.25] font-bold text-balance">{offer.productName}</h1>
-            {offer.description && <p className="mt-2 leading-8 text-muted">{offer.description}</p>}
-          </header>
-          <div className="border-y border-rule py-3 sm:py-4">
-            {offer.finalPriceSyp !== null && <p className="mb-1 text-sm font-semibold text-muted">{offer.discountPercent > 0 ? t("offers.discountedPrice") : t("offers.price")}</p>}
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              {offer.finalPriceSyp !== null && (
-                <p className="text-[clamp(1.65rem,4vw,2.4rem)] font-bold leading-tight tabular-nums">{formatSyp(offer.finalPriceSyp)}</p>
-              )}
-              {offer.originalPriceSyp !== null && offer.discountPercent > 0 && (
-                <p className="text-sm text-muted"><span className="sr-only">{t("offers.originalPrice")}{" "}</span><del>{formatSyp(offer.originalPriceSyp)}</del></p>
-              )}
-              {offer.discountPercent > 0 && (
-                <p className="rounded-md bg-mauve px-2.5 py-0.5 text-sm font-semibold">
-                  {t("offers.discount")}{" "}{formatPercent(offer.discountPercent)}
-                </p>
-              )}
+        <div className="offer-ticket lg:col-start-1 lg:row-start-1">
+          <div className="ticket-paper">
+            <header className="ticket-seam bg-canvas px-5 py-4 sm:px-6">
+              <p className="text-sm font-bold text-muted">{offer.shopName}</p>
+              <h1 className="mt-2 text-[clamp(2rem,4vw,3.5rem)] leading-[1.25] font-bold text-balance">{offer.productName}</h1>
+              {offer.description && <p className="mt-2 leading-8 text-muted">{offer.description}</p>}
+            </header>
+            <div className="px-5 py-4 sm:px-6">
+              {offer.finalPriceSyp !== null && <p className="mb-1 text-sm font-semibold text-muted">{offer.discountPercent > 0 ? t("offers.discountedPrice") : t("offers.price")}</p>}
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                {offer.finalPriceSyp !== null && (
+                  <p className="text-[clamp(1.65rem,4vw,2.4rem)] font-bold leading-tight tabular-nums">{formatSyp(offer.finalPriceSyp)}</p>
+                )}
+                {offer.originalPriceSyp !== null && offer.discountPercent > 0 && (
+                  <p className="text-sm text-muted"><span className="sr-only">{t("offers.originalPrice")}{" "}</span><del>{formatSyp(offer.originalPriceSyp)}</del></p>
+                )}
+                {offer.discountPercent > 0 && (
+                  <p className="rounded-md bg-mauve px-2.5 py-0.5 text-sm font-semibold">
+                    {t("offers.discount")}{" "}{formatPercent(offer.discountPercent)}
+                  </p>
+                )}
+              </div>
+              <p className="mt-2 text-sm text-muted"><span className="font-semibold">{t("offers.offerEnds")}</span> <bdi>{formatDate(offer.endsAt)}</bdi></p>
             </div>
-            <p className="mt-2 text-sm text-muted"><span className="font-semibold">{t("offers.offerEnds")}</span> <bdi>{formatDate(offer.endsAt)}</bdi></p>
           </div>
         </div>
-        <div className="overflow-hidden rounded-xl bg-mauve lg:col-start-2 lg:row-start-1 lg:row-span-2">
+        <div className="stamp-depth overflow-hidden rounded-xl border border-rule bg-mauve lg:col-start-2 lg:row-start-1 lg:row-span-2">
           {image ? (
            
             <img src={image} alt={offer.productName} referrerPolicy="no-referrer" className="aspect-[4/3] max-h-[50vh] w-full object-cover lg:aspect-[5/4] lg:max-h-none" />

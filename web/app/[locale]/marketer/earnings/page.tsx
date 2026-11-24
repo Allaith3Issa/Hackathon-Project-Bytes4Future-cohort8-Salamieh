@@ -30,7 +30,7 @@ export default async function MarketerEarningsPage() {
         <p className="mt-2 max-w-prose leading-7 text-muted">{t("earnings.marketerIntro")}</p>
       </header>
       {wallet ? (
-        <dl className="grid overflow-hidden rounded-xl border border-rule sm:grid-cols-2">
+        <dl className="stamp-depth grid overflow-hidden rounded-xl border border-rule sm:grid-cols-2">
           <div className="min-w-0 bg-ink p-5 text-white sm:p-7">
             <dt className="text-sm font-semibold">{t("earnings.totalCommission")}</dt>
             <dd className="mt-3 text-3xl font-bold leading-tight tabular-nums wrap-anywhere sm:text-4xl">

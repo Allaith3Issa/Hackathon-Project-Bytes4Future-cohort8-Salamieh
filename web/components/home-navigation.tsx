@@ -41,7 +41,7 @@ export function HomeNavigation({ children, signedIn }: { children: ReactNode; si
             key={href}
             href={href}
             aria-current={href === "/" ? "page" : undefined}
-            className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold whitespace-nowrap text-muted decoration-2 underline-offset-8 hover:bg-mauve/60 hover:text-ink aria-[current=page]:text-action-hover aria-[current=page]:underline"
+            className="inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold whitespace-nowrap text-muted decoration-2 underline-offset-8 hover:bg-mauve/60 hover:text-ink aria-[current=page]:text-ink aria-[current=page]:underline"
           >
             {t(label)}
           </Link>
@@ -62,14 +62,14 @@ export function HomeNavigation({ children, signedIn }: { children: ReactNode; si
             <span className="sr-only">{t("navigation.mardoodPagesMenu")}</span>
             <span aria-hidden="true" className="relative h-0.5 w-4 rounded-full bg-current before:absolute before:inset-x-0 before:-top-1.5 before:h-0.5 before:rounded-full before:bg-current after:absolute after:inset-x-0 after:top-1.5 after:h-0.5 after:rounded-full after:bg-current" />
           </summary>
-          <nav id="home-mobile-links" aria-label={t("navigation.mardoodPages")} className="surface absolute end-0 top-full z-20 mt-2 grid w-56 max-w-[calc(100vw-2rem)] gap-0.5 p-2 shadow-sm shadow-ink/10">
+          <nav id="home-mobile-links" aria-label={t("navigation.mardoodPages")} className="surface absolute end-0 top-full z-20 mt-2 grid w-56 max-w-[calc(100vw-2rem)] gap-0.5 p-2">
             {homeLinks.map(({ href, label }) => (
               <Link
                 key={href}
                 href={href}
                 aria-current={href === "/" ? "page" : undefined}
                 onClick={(event) => event.currentTarget.closest("details")?.removeAttribute("open")}
-                className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold hover:bg-mauve aria-[current=page]:text-action-hover"
+                className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-semibold hover:bg-mauve aria-[current=page]:bg-mauve"
               >
                 {t(label)}
               </Link>

@@ -55,31 +55,33 @@ const passPattern = [
 async function OfferPreview() {
   const { t, formatPercent } = await getI18n();
   return (
-    <figure aria-labelledby="offer-preview-title" className="mx-auto w-full max-w-lg min-w-0 rounded-2xl border border-dusty-mauve/40 bg-mauve/50 p-2.5 sm:p-5 lg:bg-canvas/70">
+    <figure aria-labelledby="offer-preview-title" className="mx-auto w-full max-w-lg min-w-0">
       <figcaption id="offer-preview-title" className="mb-1.5 text-xs font-semibold text-muted sm:mb-2.5 sm:text-sm">{t("home.example")}</figcaption>
-      <div className="overflow-hidden rounded-xl border border-rule bg-white shadow-sm shadow-ink/10">
-        <div className="flex items-center gap-3 border-b border-dashed border-rule bg-canvas p-2.5 sm:gap-4 sm:p-5">
-          <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg bg-action text-xl leading-none font-bold text-white sm:size-14 sm:text-3xl">{formatPercent(100).match(/[%٪]/)?.[0]}</span>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-action">{t("home.discountOffer")}</p>
-            <p className="mt-0.5 leading-tight font-bold sm:text-2xl">{t("home.saveWhenYouPayInStore")}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-2 p-2 sm:gap-3 sm:p-4">
-          <div className="flex min-w-0 items-center gap-2 rounded-lg border border-rule bg-mauve p-2 sm:gap-3 sm:p-3">
-            <div aria-hidden="true" className="grid size-10 shrink-0 grid-cols-9 grid-rows-9 rounded-md bg-white p-1.5 sm:size-14 sm:p-2">
-              {passPattern.flatMap((row, y) => [...row].map((cell, x) => (
-                <span key={`${y}-${x}`} className={cell === "1" ? "bg-ink" : undefined} />
-              )))}
-            </div>
+      <div className="offer-ticket">
+        <div className="ticket-paper">
+          <div className="flex items-center ticket-seam gap-3 bg-canvas px-4 py-3 sm:gap-4 sm:px-6 sm:py-5">
+            <span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg border border-dusty-mauve bg-mauve text-xl leading-none font-bold text-ink sm:size-14 sm:text-3xl">{formatPercent(100).match(/[%٪]/)?.[0]}</span>
             <div className="min-w-0">
-              <p className="text-sm leading-5 font-bold">{t("home.discountPass")}</p>
-              <p className="mt-0.5 text-sm leading-5 text-muted">{t("home.showAtCheckout")}</p>
+              <p className="text-sm font-semibold text-muted">{t("home.discountOffer")}</p>
+              <p className="mt-0.5 leading-tight font-bold sm:text-2xl">{t("home.saveWhenYouPayInStore")}</p>
             </div>
           </div>
-          <div className="flex min-w-0 flex-col justify-center rounded-lg bg-ink p-2.5 text-white sm:p-3">
-            <p className="text-sm leading-5 font-semibold text-mauve">{t("common.cashback")}</p>
-            <p className="mt-0.5 text-lg leading-tight font-bold sm:text-2xl">{t("home.balanceProgress")}</p>
+          <div className="grid grid-cols-1 gap-2 px-4 py-3 min-[370px]:grid-cols-2 sm:gap-3 sm:px-6 sm:py-4">
+            <div className="flex min-w-0 items-center gap-2 rounded-lg border border-rule bg-mauve p-2 sm:gap-3 sm:p-3">
+              <div aria-hidden="true" className="grid size-10 shrink-0 grid-cols-9 grid-rows-9 rounded-md bg-white p-1.5 sm:size-14 sm:p-2">
+                {passPattern.flatMap((row, y) => [...row].map((cell, x) => (
+                  <span key={`${y}-${x}`} className={cell === "1" ? "bg-ink" : undefined} />
+                )))}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm leading-5 font-bold">{t("home.discountPass")}</p>
+                <p className="mt-0.5 text-sm leading-5 text-muted">{t("home.showAtCheckout")}</p>
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-col justify-center rounded-lg bg-ink p-2.5 text-white sm:p-3">
+              <p className="text-sm leading-5 font-semibold text-mauve">{t("common.cashback")}</p>
+              <p className="mt-0.5 text-lg leading-tight font-bold sm:text-2xl">{t("home.balanceProgress")}</p>
+            </div>
           </div>
         </div>
       </div>
@@ -99,12 +101,11 @@ export default async function Home() {
     : { href: "/login", label: t("common.signIn") };
   return (
     <>
-      <section className="relative isolate overflow-hidden bg-[linear-gradient(135deg,var(--color-mauve)_0%,var(--color-canvas)_100%)] lg:bg-none">
-        <div aria-hidden="true" className="absolute inset-y-0 end-0 -z-10 hidden w-1/2 bg-linear-to-l from-mauve from-70% to-canvas rtl:bg-linear-to-r lg:block" />
+      <section className="pattern-wash">
         <div className="page-wrap grid items-center gap-4 py-6 sm:gap-6 sm:py-8 md:max-lg:max-w-[44rem] lg:min-h-[25rem] lg:max-w-7xl lg:grid-cols-2 lg:gap-10 lg:py-8 xl:gap-12">
           <div className="min-w-0">
             <h1 className="max-w-xl text-[clamp(1.875rem,8vw,2.625rem)] leading-[1.2] font-bold text-balance md:text-4xl lg:text-[clamp(2.5rem,3.4vw,3rem)]">
-              {beforeCity}<span className="text-action">{t("home.city")}</span>{punctuation}<span className="lg:block">{afterCity}</span>
+              {beforeCity}<span className="whitespace-nowrap"><span className="title-mark">{t("home.city")}</span>{punctuation}</span><span className="lg:block">{afterCity}</span>
             </h1>
             <p className="mt-3 max-w-md leading-7 text-pretty text-muted sm:text-lg sm:leading-8 lg:max-w-[25rem]">
               {t("home.openTheOfferLinkAndShow")}
@@ -116,7 +117,7 @@ export default async function Home() {
                 {...{ command: "show-modal", commandfor: "how-it-works-dialog" }}
                 aria-haspopup="dialog"
                 aria-controls="how-it-works-dialog"
-                className="text-link inline-flex min-h-11 cursor-pointer items-center text-sm text-action-hover sm:text-base"
+                className="text-link inline-flex min-h-11 cursor-pointer items-center text-sm sm:text-base"
               >
                 {t("home.howDoIUseAnOffer")}
               </button>
