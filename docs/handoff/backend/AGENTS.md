@@ -40,9 +40,9 @@ These instructions apply to work under the repository-root `api/` application di
 
 ## Session refresh and admin sign-in
 
-- Issue a 15-minute access token and an opaque refresh token at sign-in. Support both Next.js cookie refresh and React Native (Expo) token refresh through the [API contract](../API_CONTRACT.md#authentication-and-sessions). Store refresh token hashes server-side, rotate the token atomically on a successful refresh, and prevent reuse of a rotated token.
-- Enforce an inactivity limit of 30 days on every session, including admin sessions. Use the server clock and the last qualifying user activity. Initialize it on sign-in and update it only after genuine authenticated activity. Automatic refresh, polling, and background requests do not extend the inactivity window. On expiry or explicit sign-out, invalidate the session and reject its tokens.
-- Provision the team's existing admin account in the backend's initialization or seed step after database migrations idempotently using backend-only environment configuration. Keep admin sign-in behind `/auth/admin/login` and enforce the `admin` role on every `/admin/*` endpoint.
+- Issue a 30-minute access JWT and an opaque refresh token at sign-in. Store only the refresh token hash and rotate it atomically on successful refresh. Reject reuse. The [API contract](../API_CONTRACT.md#authentication-and-sessions) applies to both Next.js and Expo clients.
+- Give every session, including admin sessions, a fixed 30-day lifetime from creation. Refresh changes neither expiry nor the activity timestamp. Logout requires a valid access JWT for the session. If the caller includes a refresh token, it must match that session's current token.
+- Public signup supports multiple public roles and cannot assign `admin`. Provision the first administrator manually with the [bootstrap CLI](../../../api/ADMIN_BOOTSTRAP.md) after migrations. Use `/auth/admin/login` for admin sign-in and enforce the `admin` role on every `/admin/*` endpoint.
 
 ## Keep the implementation simple and efficient
 

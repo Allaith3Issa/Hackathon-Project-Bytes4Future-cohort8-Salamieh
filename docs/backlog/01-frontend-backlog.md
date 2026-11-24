@@ -8,6 +8,8 @@ Start backlog implementation after the [live Android and web rehearsal and backe
 
 ## First · Cashback vouchers
 
+**Intentionally deferred.** The merchant scanner has partial voucher UI. Customer voucher operations and the scanner's voucher API integration remain pending.
+
 | Owner | Task |
 | --- | --- |
 | **Alaa Esmail** | Add customer voucher issuance and cancellation. Show the voucher QR, copyable manual code, active status, and the API’s available cashback balance. |
@@ -19,17 +21,17 @@ Build both screens from the contract examples while Laith implements the endpoin
 
 ## Alaa · Remaining tasks
 
-- Build the public customer registration form once Allaith publishes the registration contract.
+- Public registration is implemented and has reached main. Its browser-to-backend rehearsal is pending. See [implementation status](../handoff/IMPLEMENTATION_STATUS.md) for Web follow-ups.
 - Continue the public web improvements and build the full marketer web workspace for campaigns, wallet, statistics, and payouts.
 - Build the public leaderboard using Laith’s backend data.
 
 ## Tayma · Remaining tasks
 
-- Build the admin merchant verification views with Allaith.
+- Admin merchant verification and revenue reporting screens are implemented. The separately prepared Merchant Dashboard, Wallet, and Scanner Recovery handoff still needs publication and verification on a shared branch.
 - Add campaign approval controls and store-discount campaign and checkout screens when their API contracts are ready.
 - Add camera scanning alongside the existing manual code entry.
-- Build the admin payout, receipt, and reporting pages using Laith’s API.
+- Build the deferred admin payout, receipt, and broader overview screens when the related APIs are ready.
 
-**Suggested order after vouchers:** Registration and verification first. Then coordinate campaign and scanner work. Build payout and reporting screens once the corresponding API examples are available.
+**Suggested order after vouchers:** Coordinate deferred campaign and scanner work, then payouts and broader reporting as the API becomes available.
 
 [API contract](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/handoff/API_CONTRACT.md) · [Frontend ownership](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/tasks/02-frontend.md)
