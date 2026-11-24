@@ -4,7 +4,7 @@
 
 This is the design reference for the Next.js frontend. Use the [API contract](../API_CONTRACT.md) for fields and state transitions, the [team task split](../HACKATHON_TASKS.md) for ownership, and the [frontend instructions](AGENTS.md) for implementation boundaries. The route names below describe web pages. API calls keep their `/api/v1` paths.
 
-**Arabic only.** Set `lang="ar"` and `dir="rtl"` on the root HTML element. All visible copy, validation, error messages, and accessible names are Arabic. English screen descriptions in this guide are implementation notes. Use logical layout properties, put the wide workspace navigation at the inline start (right), and isolate phone numbers, links, and codes where their reading direction differs.
+**Arabic and English.** Arabic is the default (`lang="ar"`, `dir="rtl"`). English routes use `lang="en"` and `dir="ltr"`. Localize visible copy, validation, errors, and accessible names. Use logical layout properties, put workspace navigation at the inline start, and isolate phone numbers, links, and codes where their reading direction differs. See the [current Web design guide](../../../web/design.md) for bilingual implementation details.
 
 ## Design direction
 

@@ -8,6 +8,8 @@ Start backlog implementation after the [live Android and web rehearsal and backe
 
 ## First · Cashback vouchers
 
+**Intentionally deferred** until the core rehearsal and integration checks pass.
+
 - **Laith Alhaj Husain** owns issuance, cancellation, and redemption. Reserve cashback once at issuance, release it on cancellation, and credit the redeeming merchant once. Keep the voucher active if the bill is smaller than its value.
 - **Allaith Issa** coordinates the voucher contract and demo seed with Laith. Publish the request and response examples so Alaa and Tayma can build in parallel, then help run the live rehearsal.
 
@@ -15,16 +17,18 @@ Start backlog implementation after the [live Android and web rehearsal and backe
 
 ## Allaith · Remaining tasks
 
-- Implement registration and merchant verification. Hand their API examples to Alaa and Tayma.
-- Implement approval-based joining and merchant direct referrals.
+- Registration and merchant verification are implemented and verified. Their API examples and contracts are available to Alaa and Tayma.
+- Implement approval-based joining and the full merchant direct-referral workflow. Preserve existing resolution and settlement for stored direct codes.
 - Own store-discount campaign pricing, configuration, and preview. Agree on the discounted cash cap and reserve calculations with Laith before checkout integration.
 
 ## Laith · Remaining tasks
 
 - Implement store-discount checkout using the agreed pricing and cap rules.
 - Implement payout requests, transfer receipts, and dispute resolution before the web and Expo payout integrations.
-- Provide wallet reporting, statistics, and leaderboard data for web and mobile.
+- Wallet reads, transaction history, and statistics are implemented and verified. Leaderboard data and the broader admin overview remain deferred. Preserve the implemented admin revenue reports.
 
-**Suggested order after vouchers:** Registration and verification first, then campaign and checkout extensions, then payouts and reporting. Each team can start UI work from agreed examples while the backend work is underway.
+**Suggested order after vouchers:** Campaign and checkout extensions, then payouts and broader reporting.
+
+See [implementation status](../handoff/IMPLEMENTATION_STATUS.md#pending-and-deferred-audit-items) for pending BE-01 and BE-03 and the approved Step 13D and OP-01 deferrals.
 
 [API contract](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/handoff/API_CONTRACT.md) · [Backend ownership](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/main/docs/tasks/01-backend.md)

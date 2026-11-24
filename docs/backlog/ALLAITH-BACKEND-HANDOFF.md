@@ -28,8 +28,8 @@ You coordinate the contract, examples, seed, and rehearsal. **Laith implements v
 - **Before coding checkout integration**, agree with Laith on shared pricing inputs and outputs, rounding, fees, cashback, reserve deductions, and errors. The sales cap counts the cash amount **after the store discount**. Checkout should reject a purchase above the remaining cap while keeping the pass active. At the cap, checkout closes the campaign and releases any unused reserve in the sale transaction.
 - You own campaign-side pricing, configuration, preview, launch, and reserve locking. **Laith owns scanner preview and redemption for store discounts.** Run shared integration cases for exact-cap and over-cap purchases, insufficient reserve, launch or checkout retries, and unchanged product-campaign behavior.
 
-## Small documentation follow-up
+## Current status
 
-Update the backend guide’s access-token lifetime from **15 minutes** to **30 minutes** to match the merged implementation and tests.
+The review above records the state at `059888d`. See [implementation status](../handoff/IMPLEMENTATION_STATUS.md) for current decisions and merge status. The [active backend instructions](../handoff/backend/AGENTS.md#session-refresh-and-admin-sign-in) document the approved access JWT and database session policy.
 
 [Backend backlog and ownership](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/059888df2701327f4719634d81bf8ee9c774c142/docs/backlog/02-backend-backlog.md) · [API contract](https://github.com/Allaith3Issa/Hackathon-Project-Bytes4Future-cohort8-Salamieh/blob/059888df2701327f4719634d81bf8ee9c774c142/docs/handoff/API_CONTRACT.md)

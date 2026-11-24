@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { CampaignModule } from './campaign/campaign.module';
 import { validateApiConfig } from './config/api-config';
 import { HealthModule } from './health/health.module';
+import { MediaModule } from './media/media.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ReferralModule } from './referral/referral.module';
 import { ReportingModule } from './reporting/reporting.module';
@@ -21,6 +22,7 @@ import { ScannerModule } from './scanner/scanner.module';
     ScannerModule,
     AdminMerchantModule,
     ReportingModule,
+    MediaModule,
   ],
 })
 export class AppModule {}

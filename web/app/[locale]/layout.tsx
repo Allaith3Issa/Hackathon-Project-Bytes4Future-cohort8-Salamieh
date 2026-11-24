@@ -13,12 +13,14 @@ import "@fontsource/ibm-plex-sans/700.css";
 import { I18nProvider } from "@/components/i18n-provider";
 import { signOut } from "@/app/actions";
 import { HomeNavigation } from "@/components/home-navigation";
-import { SessionRefresh } from "@/components/session-refresh";
+import { SessionRefresh, SessionSignOut } from "@/components/session-refresh";
 import { SiteFooter } from "@/components/site-footer";
 
 import mardoodLogo from "../../public/brand/mardood-logo.png";
 import "../globals.css";
 import { getAccount, sessionTokens } from "@/lib/session";
+import { logoutScope } from "@/lib/session-logout";
+import { discoverCampaignsPath } from "@/lib/marketer-campaigns";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { t } = await getI18n();
@@ -37,7 +39,10 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
   const { t } = await getI18n();
   const { accessToken, refreshToken } = await sessionTokens();
   const account = accessToken ? await getAccount().catch(() => null) : null;
-  const link = "inline-flex min-h-11 items-center rounded-lg px-2 font-semibold hover:bg-mauve sm:px-3";
+  const signOutForm = (account || refreshToken)
+    ? <SessionSignOut signOutAction={signOut.bind(null, logoutScope({ accessToken, refreshToken }))} label={t("navigation.signOut")} />
+    : null;
+  const link = "inline-flex min-h-11 items-center rounded-md px-3 font-semibold hover:bg-mauve";
   return (
     <html lang={locale} dir={locale === "ar" ? "rtl" : "ltr"}>
       <body className="flex min-h-screen flex-col">
@@ -46,22 +51,23 @@ export default async function RootLayout({ children, params }: Readonly<{ childr
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-3 focus:z-10 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2">
           {t("navigation.skipToContent")}
         </a>
-        <header className="border-b border-rule bg-white">
-          <div className="page-wrap flex min-h-18 flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5 has-[.home-navigation]:max-w-7xl">
+        <header className="border-b-[3px] border-dusty-mauve bg-white">
+          <div className="page-wrap flex min-h-14 items-center justify-between gap-2 py-1.5">
             <Link href="/" aria-label={t("navigation.home", { value0: t("common.brand") })} className="inline-flex min-h-11 shrink-0 items-center">
-              <Image src={mardoodLogo} alt="" sizes="(min-width: 640px) 144px, 112px" className="h-auto w-28 sm:w-36" />
+              <Image src={mardoodLogo} alt="" sizes="(min-width: 640px) 112px, 88px" className="h-auto w-22 sm:w-28" />
             </Link>
-            <HomeNavigation signedIn={Boolean(account)}>
-              <nav aria-label={t("navigation.mainNavigation")} className="flex flex-wrap items-center gap-2 text-sm sm:gap-4 sm:text-base">
+            <HomeNavigation signedIn={Boolean(account)} hasSession={Boolean(signOutForm)}>
+              <nav aria-label={t("navigation.mainNavigation")} className="grid gap-0.5 text-sm [&_form>button]:w-full">
                 {account ? (
                   <>
                     {account.roles.includes("customer") && <Link href="/customer" className={link}>{t("common.cashback")}</Link>}
-                    {account.roles.includes("merchant") && <Link href="/merchant/campaigns" className={link}>{t("navigation.merchantDashboard")}</Link>}
+                    {account.roles.includes("merchant") && <Link href="/merchant" className={link}>{t("navigation.merchantDashboard")}</Link>}
+                    {account.roles.includes("marketer") && <Link href={discoverCampaignsPath} className={link}>{t("marketerCampaigns.discover")}</Link>}
                     {account.roles.includes("marketer") && <Link href="/marketer/earnings" className={link}>{t("earnings.marketerTitle")}</Link>}
                     {account.roles.includes("admin") && <Link href="/admin/revenue" className={link}>{t("navigation.admin")}</Link>}
-                    <form action={signOut}><button className="button-secondary" type="submit">{t("navigation.signOut")}</button></form>
+                    {signOutForm}
                   </>
-                ) : <Link href="/login" className="button-secondary px-3 sm:px-4">{t("common.signIn")}</Link>}
+                ) : signOutForm ?? <Link href="/login" className="button-secondary header-action px-3 whitespace-nowrap sm:px-4">{t("common.signIn")}</Link>}
               </nav>
             </HomeNavigation>
           </div>

@@ -1,12 +1,12 @@
 # PostgreSQL schema notes for Step 02C
 
-The Prisma schema preserves the [ERD](../../docs/handoff/DATABASE_ERD.md) names in PostgreSQL. User roles come from the customer, marketer, and admin flags and the presence of a merchant profile. A user can hold several roles at once. The wallet enum only covers the two roles with wallets.
+The Prisma schema preserves the [ERD](../../docs/handoff/DATABASE_ERD.md) names in PostgreSQL. User roles come from the customer, marketer, and admin flags and the presence of a merchant profile. A user can hold several roles at once. The wallet enum only covers the two roles with wallets. The SQL examples below describe constraints implemented in [0001_init_mvp](migrations/0001_init_mvp/migration.sql). [0002_merchant_topup_balance_snapshot](migrations/0002_merchant_topup_balance_snapshot/migration.sql) adds the nullable post-credit balance and its monetary check.
 
 Dedicated monetary columns use PostgreSQL `bigint` and store integer hundredths of one new Syrian Pound. The exact decimal `commission_value` stores an integer minor-unit amount for fixed commissions and a percentage otherwise. The existing bounds, column names and Prisma mappings continue to apply. Verified old-SYP integers carry over unchanged. For any amount with uncertain historical denomination, check its source records and reconcile related balances and ledger entries before making a correction. The schema retains the ERD’s campaign and attribution variants. This step covers the 13 core models, with voucher and payout tables and their ledger links deferred.
 
 ## Active Offer QR uniqueness
 
-Prisma 7.10.1 represents both ERD partial unique indexes in the schema through the `partialIndexes` preview feature. Check that Step 02C emits these predicates. The equivalent PostgreSQL is shown here for verification.
+Prisma 7.10.1 represents both ERD partial unique indexes through the `partialIndexes` preview feature. The initial migration contains both predicates.
 
 ```sql
 CREATE UNIQUE INDEX offer_qr_passes_active_marketer_key
@@ -18,9 +18,9 @@ CREATE UNIQUE INDEX offer_qr_passes_active_direct_key
   WHERE status = 'active' AND campaign_marketer_id IS NULL;
 ```
 
-## CHECK constraints to add in Step 02C
+## CHECK constraints in the initial migration
 
-Prisma 7 cannot declare these PostgreSQL `CHECK` constraints in its schema. Add the following SQL after the generated table definitions in Step 02C. These checks enforce the [contract’s monetary bounds](../../docs/handoff/API_CONTRACT.md#monetary-limits-and-precision), phone format, and row-level pricing and settlement invariants.
+Prisma 7 cannot declare these PostgreSQL `CHECK` constraints in its schema. The initial migration defines them after the table definitions. These checks enforce the [contract’s monetary bounds](../../docs/handoff/API_CONTRACT.md#monetary-limits-and-precision), phone format, and row-level pricing and settlement invariants.
 
 ```sql
 ALTER TABLE users
@@ -130,7 +130,7 @@ ALTER TABLE money_movements
 
 The schema’s composite foreign keys tie referral clicks and Offer QRs to memberships in their own campaign. They also tie each sale to its pass’s campaign and customer and its campaign’s merchant. The unique `offer_qr_pass_id` still allows only one sale per pass. A null membership is reserved for direct merchant attribution.
 
-The remaining equality between a sale and its pass is nullable. PostgreSQL’s default composite foreign-key matching skips the check when a referencing component is null. Add these triggers in Step 02C to compare attribution null-safely and keep the pass’s issued attribution immutable. An existing pass remains bound to its attribution as its status changes.
+Attribution can be null. PostgreSQL’s default composite foreign-key matching skips the check when a referencing component is null. The initial migration installs the following triggers to compare attribution null-safely and keep the pass’s issued attribution immutable as its status changes.
 
 ```sql
 CREATE FUNCTION prevent_offer_qr_attribution_change()

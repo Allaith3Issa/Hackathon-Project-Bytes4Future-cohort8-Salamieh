@@ -46,7 +46,7 @@ Prepaid reserves fund commissions for eligible sales settled through the platfor
 - The backend is the single source of truth: Next.js and React Native (Expo) consume the same `/api/v1` REST API.
 - No direct database access from web or mobile.
 - No work pushes directly to `main`; use feature branches and pull requests.
-- Secrets (`DATABASE_URL`, `JWT_SECRET`, admin seed config) stay in `.env` and are never committed.
+- Keep `DATABASE_URL`, `JWT_SECRET`, and administrator bootstrap inputs in private server or operator environments. Use ignored `.env` files for local settings. See the [first-admin bootstrap guide](../../api/ADMIN_BOOTSTRAP.md) for the hosted setup.
 
 ---
 

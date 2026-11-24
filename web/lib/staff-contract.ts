@@ -2,6 +2,30 @@ import type { Account } from "./contract";
 export type { Page } from "./contract";
 
 export interface MerchantWallet { availableBalanceSyp: number; totalLockedReservesSyp: number; creditLimitSyp: number }
+export interface MerchantDashboard {
+  verificationStatus: MerchantVerificationStatus;
+  wallet: MerchantWallet;
+  activeCampaignsCount: number;
+  topCampaign: { campaignId: string; productName: string; grossCashSalesSyp: number; salesCount: number } | null;
+  stats: {
+    clicks: number;
+    salesCount: number;
+    itemsSold: number;
+    grossCashSalesSyp: number;
+    commissionPaidSyp: number;
+    platformFeesPaidSyp: number;
+    conversionRatePercent: number;
+  };
+}
+export interface MerchantWalletTransaction {
+  id: string;
+  kind: "merchant_topup" | "campaign_reserve_lock" | "campaign_reserve_unlock" | "sale_reserve_debit" | "cashback_voucher_merchant_credit";
+  amountSyp: number;
+  campaignId: string | null;
+  campaignName: string | null;
+  referenceNote: string | null;
+  createdAt: string;
+}
 export interface MarketerWallet {
   availableBalanceSyp: number;
   pendingPayoutSyp: number;

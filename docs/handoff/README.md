@@ -6,11 +6,11 @@ Local affiliate marketing and cashback platform connecting small businesses in S
 
 ## Core Architecture & Tech Stack
 
-- **Web Frontend (`web/`)**: Next.js + TypeScript (Arabic RTL)
+- **Web Frontend (`web/`)**: Next.js + TypeScript, with Arabic RTL by default and English localization
 - **Backend API (`api/`)**: NestJS + TypeScript + Swagger (`/api/v1`)
 - **Database**: PostgreSQL (single source of truth; no direct DB access from web or mobile)
 - **Mobile App (separate repo)**: React Native with Expo + TypeScript (Marketer Android app)
-- **Payments Model**: Cash-in-store at checkout + Prepaid Merchant Platform Balance (SYP) + Closed-loop Customer Cashback Vouchers + Admin-verified Sham Cash / manual payouts for marketers
+- **Payments Model**: Cash-in-store checkout and prepaid merchant balances in new SYP minor units. Closed-loop cashback vouchers and manual marketer payouts are deferred.
 - **Demo access**: Agree on the API and public web URLs on Day 1 and verify both on the Android device.
 
 ## Day 1 handoff
@@ -24,6 +24,8 @@ Use the [shared demo seed and API examples](API_CONTRACT.md#shared-demo-seed-and
 - [API Contract](API_CONTRACT.md) — Shared REST v1 contract for Next.js and React Native (Expo)
 - [Team Task Split](HACKATHON_TASKS.md) — Responsibilities across backend, web, and mobile
 - [Three-Day Roadmap](HACKATHON_ROADMAP.md) — Parallel build plan and checkpoints
+- [Implementation Status](IMPLEMENTATION_STATUS.md) — Verified branch state, audit follow-ups, and integration gates
+- [Deployment Guide](../../api/DEPLOYMENT.md) — Planned Render, Neon, and Netlify configuration
 - [Backend Agent Instructions](backend/AGENTS.md) — NestJS implementation and security rules
-- [Frontend Agent Instructions](frontend/AGENTS.md) — Next.js implementation and Arabic RTL rules
+- [Frontend Agent Instructions](frontend/AGENTS.md) — Next.js implementation and localization rules
 - [Frontend Design Guide](../../web/design.md) — Color tokens, typography, and screen layouts

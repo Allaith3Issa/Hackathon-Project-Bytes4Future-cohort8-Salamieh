@@ -7,6 +7,7 @@ import { RecoveringSession } from "@/components/recovering-session";
 import { expiredRedirect, requirePageRole } from "@/lib/staff";
 import type { MerchantCampaign, Page } from "@/lib/staff-contract";
 import { staffError, statusLabels } from "@/lib/staff-ui";
+import { CampaignImage } from "@/components/campaign-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getI18n()).t("campaigns.myCampaigns") };
@@ -39,8 +40,12 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         <ul className="surface divide-y divide-rule overflow-hidden">
           {data.items.map((c) => (
             <li key={c.id}>
-              <Link href={`/merchant/campaigns/${encodeURIComponent(c.id)}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 hover:bg-mauve">
-                <span><span className="block font-semibold">{c.productName}</span><span className="text-sm text-muted">{t("campaigns.ends")}{" "}{formatDate(c.endsAt)}</span></span>
+              <Link href={`/merchant/campaigns/${encodeURIComponent(c.id)}`} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-mauve">
+                <span className="flex min-w-0 items-center gap-3">
+                  <CampaignImage url={c.imageUrl} alt="" className="size-14 shrink-0 rounded-lg bg-mauve object-cover"
+                    fallback={<span aria-hidden="true" className="size-14 shrink-0 rounded-lg bg-mauve" />} />
+                  <span className="min-w-0"><span className="block font-semibold wrap-anywhere">{c.productName}</span><span className="text-sm text-muted">{t("campaigns.ends")}{" "}{formatDate(c.endsAt)}</span></span>
+                </span>
                 <span className="text-sm tabular-nums">{c.finalPriceSyp === null ? "" : `${formatMoney(c.finalPriceSyp)} · `}{t(statusLabels[c.status])}</span>
               </Link>
             </li>

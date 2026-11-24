@@ -1,6 +1,8 @@
 # Three-day hackathon roadmap
 **Team 3 · Affiliate Marketing Platform**
 
+The day-by-day checkpoints describe the original build plan. See [implementation status](IMPLEMENTATION_STATUS.md) for verified progress. The current sequence is Web and Backend integration, then the separate Expo audit and system rehearsal, then deployment.
+
 ## Day 1 · Freeze the contract and work in parallel
 
 In the first hour, Allaith and Laith agree on the pricing and close operations, lock order and replay behavior. Allaith publishes the [shared demo seed and API examples](API_CONTRACT.md#shared-demo-seed-and-api-examples) for the backend, web and Expo. Include the verified merchant, marketer, customer and a pre-issued Offer QR for the scanner team. Decide the public web and API URLs and exercise both from the Android demo device.
@@ -31,4 +33,4 @@ Share focused PRs with working routes or screens, sample IDs and test steps. Rai
 
 ## Hosting & deployment checkpoint
 
-Choose a reachable API and public Next.js URL on Day 1. Configure the backend's public web base URL for referral generation. Verify Android and the Next.js server can reach the API, and verify a clean demo seed before the rehearsal.
+Deployment remains postponed until system integration is complete. For the eventual release, follow the [deployment guide](../../api/DEPLOYMENT.md). Configure the backend's public Web origin for referral links, check that the Next.js server and Android device can reach the API, and verify the demo fixtures before rehearsal.

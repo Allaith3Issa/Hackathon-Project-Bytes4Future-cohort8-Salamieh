@@ -1,8 +1,6 @@
-import { apiRequest, ApiError } from "@/lib/api";
-import type { AuthSession } from "@/lib/contract";
+import { ApiError } from "@/lib/api";
 import { clearSession, saveSession, sessionTokens } from "@/lib/session";
-
-const pending = new Map<string, Promise<AuthSession>>();
+import { withSessionRotation } from "@/lib/session-rotation";
 
 export async function POST(request: Request) {
   const host = request.headers.get("host");
@@ -17,25 +15,18 @@ export async function POST(request: Request) {
     return new Response(null, { status: 401 });
   }
 
-  let exchange = pending.get(refreshToken);
-  if (!exchange) {
-    exchange = apiRequest<AuthSession>("/auth/refresh", {
-      method: "POST",
-      body: { refreshToken },
-    });
-    pending.set(refreshToken, exchange);
-  }
-
-  try {
-    await saveSession(await exchange);
-    return new Response(null, { status: 204 });
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 401) {
-      await clearSession();
-      return new Response(null, { status: 401 });
+  return withSessionRotation(refreshToken, async (rotation) => {
+    if (rotation.signingOut) return new Response(null, { status: 409 });
+    try {
+      const saved = await saveSession(await rotation.rotate(), () => !rotation.signingOut);
+      return new Response(null, { status: saved ? 204 : 409 });
+    } catch (error) {
+      if (rotation.signingOut) return new Response(null, { status: 409 });
+      if (error instanceof ApiError && error.status === 401) {
+        await clearSession();
+        return new Response(null, { status: 401 });
+      }
+      return new Response(null, { status: 503 });
     }
-    return new Response(null, { status: 503 });
-  } finally {
-    pending.delete(refreshToken);
-  }
+  });
 }

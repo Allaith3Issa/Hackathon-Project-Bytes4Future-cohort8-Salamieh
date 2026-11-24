@@ -1,9 +1,8 @@
 import { getI18n } from "@/lib/i18n-server";
 import Link from "@/components/localized-link";
 
-const linkGroups = [
+const footerLinks = [
   {
-    id: "footer-pages",
     title: "footer.exploreMardood",
     links: [
       { href: "/", label: "navigation.home2" },
@@ -13,7 +12,6 @@ const linkGroups = [
     ],
   },
   {
-    id: "footer-policies",
     title: "footer.platformPolicies",
     links: [
       { href: "/privacy", label: "privacy.privacyPolicy" },
@@ -27,20 +25,20 @@ export async function SiteFooter() {
   const year = new Intl.NumberFormat(locale === "ar" ? "ar-SY" : "en", { useGrouping: false }).format(new Date().getFullYear());
 
   return (
-    <footer className="bg-ink text-white [&_a:focus-visible]:outline-white">
+    <footer className="footer-lattice bg-ink text-white [&_a:focus-visible]:outline-white">
       <div className="page-wrap">
-        <div className="grid gap-x-8 gap-y-5 py-7 sm:grid-cols-2 sm:py-8 md:grid-cols-[1.4fr_1fr_1fr]">
-          <div className="sm:col-span-2 md:col-span-1">
-            <Link href="/" className="inline-flex min-h-11 items-center rounded-sm text-2xl font-bold hover:text-mauve">{t("common.brand")}</Link>
-            <p className="mt-1 max-w-xs text-sm leading-7 text-mauve">{t("footer.getOffersFromSalamiehStoresUse")}</p>
+        <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-x-4 gap-y-3 pt-4 pb-2 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.85fr)] sm:gap-x-8 sm:pt-5 sm:pb-3">
+          <div className="col-span-2 sm:col-span-1">
+            <p className="font-bold">{t("common.brand")}</p>
+            <p className="mt-1 max-w-xs text-sm leading-5 text-mauve sm:leading-6">{t("footer.getOffersFromSalamiehStoresUse")}</p>
           </div>
-          {linkGroups.map(({ id, title, links }) => (
-            <nav key={id} aria-labelledby={id} className="border-t border-mauve/25 pt-3 sm:border-t-0 md:pt-2">
-              <h2 id={id} className="font-bold">{t(title)}</h2>
+          {footerLinks.map(({ title, links }) => (
+            <nav key={title} aria-label={t(title)}>
+              <p className="text-sm font-bold">{t(title)}</p>
               <ul role="list" className="mt-1">
                 {links.map(({ href, label }) => (
                   <li key={href}>
-                    <Link href={href} className="inline-flex min-h-11 items-center rounded-sm text-sm text-mauve underline-offset-4 hover:text-white hover:underline">
+                    <Link href={href} className="inline-flex min-h-8 items-center rounded-sm text-sm leading-5 text-mauve underline-offset-4 hover:text-white hover:underline sm:min-h-7">
                       {t(label)}
                     </Link>
                   </li>
@@ -49,7 +47,7 @@ export async function SiteFooter() {
             </nav>
           ))}
         </div>
-        <p className="border-t border-mauve/25 py-4 text-sm text-mauve">© {year}{" "}{t("common.brand")}</p>
+        <p className="border-t border-mauve/30 py-2.5 text-xs text-mauve">© <bdi>{year}</bdi>{" "}{t("common.brand")}</p>
       </div>
     </footer>
   );

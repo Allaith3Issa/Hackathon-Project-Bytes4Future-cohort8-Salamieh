@@ -10,6 +10,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       {account?.roles.includes("admin") && <StaffNav label={t("admin.adminNavigation")} items={[
         ["/admin/revenue", t("earnings.dashboardTitle")],
         ["/admin/topups", t("admin.balanceTopUps")],
+        ["/admin/payouts", t("payouts.adminTitle")],
         ["/admin/merchants", t("verification.title")],
       ]} />}
       {children}

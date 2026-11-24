@@ -8,8 +8,9 @@ import { RecoveringSession } from "@/components/recovering-session";
 import { ApiError } from "@/lib/api";
 import { authenticatedRequest } from "@/lib/session";
 import { expiredRedirect, requirePageRole } from "@/lib/staff";
-import type { MerchantCampaign } from "@/lib/staff-contract";
+import type { MerchantCampaign, MerchantWallet, MerchantWalletTransaction, Page } from "@/lib/staff-contract";
 import { staffError, statusLabels } from "@/lib/staff-ui";
+import { CampaignImage } from "@/components/campaign-image";
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getI18n()).t("campaigns.campaignDetails") };
@@ -46,7 +47,9 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
         <h1 className="page-title">{c.productName}</h1>
         <p className="mt-1 text-muted">{t(statusLabels[c.status])}{" "}{t("campaigns.ends2")}{" "}{formatDate(c.endsAt)}</p>
       </div>
-      <dl className="grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
+      <CampaignImage url={c.imageUrl} alt={c.productName} className="aspect-[4/3] w-full max-w-sm rounded-xl bg-mauve object-cover"
+        fallback={<div className="notice max-w-sm">{t("productImage.unavailable")}</div>} />
+      <dl className="stamp-depth grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-ink p-5 text-white sm:p-7">
           <dt className="text-sm font-semibold">{t("campaigns.currentLockedReserve")}</dt>
           <dd className="mt-3 text-3xl font-bold tabular-nums sm:text-4xl">{formatMoney(u.lockedBudgetSyp)}</dd>
@@ -61,9 +64,41 @@ export default async function CampaignPage({ params }: { params: Promise<{ id: s
       </dl>
       <section className="surface grid gap-3 p-5 sm:p-6" aria-labelledby="close-title">
         <h2 id="close-title" className="text-xl font-bold">{t("campaigns.closeCampaign")}</h2>
-        {c.status === "ended" ? <p className="notice">{t("campaigns.thisCampaignHasEndedAndThe")}</p> : <CloseCampaign id={c.id} />}
+        {c.status === "ended" ? <ClosedCampaignDetails id={c.id} /> : <CloseCampaign id={c.id} />}
       </section>
       <Link href="/merchant/campaigns" className="text-link">{t("campaigns.allCampaigns")}</Link>
     </div>
+  );
+}
+
+async function ClosedCampaignDetails({ id }: { id: string }) {
+  const { t, formatSyp } = await getI18n();
+  const [wallet, ledger] = await Promise.allSettled([
+    authenticatedRequest<MerchantWallet>("/merchant/wallet"),
+    authenticatedRequest<Page<MerchantWalletTransaction>>("/merchant/wallet/transactions"),
+  ]);
+  const release = ledger.status === "fulfilled"
+    ? ledger.value.items.find((line) => line.kind === "campaign_reserve_unlock" && line.campaignId === id)
+    : undefined;
+
+  return (
+    <>
+      <p className="notice">{t("campaigns.thisCampaignHasEndedAndThe")}</p>
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-sm text-muted">{t("earnings.availableBalance")}</dt>
+          <dd className="font-semibold tabular-nums">
+            {wallet.status === "fulfilled" ? <bdi>{formatSyp(wallet.value.availableBalanceSyp)}</bdi> : t("merchantReporting.walletUnavailable")}
+          </dd>
+        </div>
+        {release && (
+          <div>
+            <dt className="text-sm text-muted">{t("merchantReporting.reserveReleased")}</dt>
+            <dd className="font-semibold tabular-nums"><bdi>{formatSyp(release.amountSyp)}</bdi></dd>
+          </div>
+        )}
+      </dl>
+      <Link className="text-link" href="/merchant/wallet#wallet-history">{t("merchantReporting.walletHistory")}</Link>
+    </>
   );
 }
