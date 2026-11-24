@@ -1,7 +1,9 @@
 import { ApiConfigurationError, validateDatabaseConfig } from '../prisma/database-config';
+import { parseCashbackThresholds } from './cashback-thresholds';
 
 export function validateApiConfig(config: Record<string, unknown>) {
   validateDatabaseConfig(config);
+  parseCashbackThresholds(config.CASHBACK_MILESTONE_PURCHASES, config.CASHBACK_MILESTONE_SPEND_SYP);
   if (config.NODE_ENV !== 'production') return config;
 
   const secret = config.JWT_SECRET;
