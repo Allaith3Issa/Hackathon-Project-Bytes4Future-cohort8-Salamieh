@@ -7,7 +7,8 @@ import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { cashbackThresholds } from '../config/cashback-thresholds';
 import type { CustomerDashboardDto, CustomerPurchasePageDto } from './dto/customer-reporting.dto';
-import type { MarketerMerchantEarningsPageDto, MarketerStatsDto, MarketerWalletDto, MarketerWalletTransactionPageDto } from './dto/marketer-reporting.dto';
+import { marketerKinds, type MarketerMerchantEarningsPageDto, type MarketerStatsDto, type MarketerWalletDto,
+  type MarketerWalletTransactionPageDto } from './dto/marketer-reporting.dto';
 import type { MerchantDashboardDto, MerchantWalletDto, MerchantWalletTransactionDto, MerchantWalletTransactionPageDto } from './dto/merchant-reporting.dto';
 import { readPage } from '../common/pagination';
 
@@ -123,9 +124,12 @@ export class ReportingService {
     return this.read(async (tx) => {
       const wallet = await this.wallet(tx, userId, 'marketer');
       const totals = await this.marketerTotals(tx, userId);
+      const { _sum } = await tx.payoutRequest.aggregate({
+        where: { marketerId: userId, status: 'confirmed' }, _sum: { amountSyp: true },
+      });
       return { availableBalanceSyp: toMoneyJsonInteger(wallet.availableBalanceSyp),
         pendingPayoutSyp: toMoneyJsonInteger(wallet.pendingPayoutSyp),
-        totalEarnedSyp: sumMoney(totals.earned), totalConfirmedPaidOutSyp: 0 };
+        totalEarnedSyp: sumMoney(totals.earned), totalConfirmedPaidOutSyp: toMoneyJsonInteger(_sum.amountSyp ?? 0n) };
     });
   }
 
@@ -152,13 +156,13 @@ export class ReportingService {
   marketerTransactions(userId: string, page: PageQueryDto): Promise<MarketerWalletTransactionPageDto> {
     return this.read(async (tx) => {
       const wallet = await this.wallet(tx, userId, 'marketer');
-      const where = { walletId: wallet.id, kind: 'marketer_commission_credit' } satisfies Prisma.MoneyMovementWhereInput;
+      const where = { walletId: wallet.id, kind: { in: [...marketerKinds] } } satisfies Prisma.MoneyMovementWhereInput;
       return readPage(page, await tx.moneyMovement.count({ where }), async (skip, take) => {
         const rows = await tx.moneyMovement.findMany({ where, skip, take, orderBy: newestMovement, include: {
           campaign: { select: { productName: true, merchant: { select: { shopName: true } } } },
         } });
         return rows.map((row) => ({
-          id: row.id, kind: where.kind, amountSyp: toMoneyJsonInteger(row.amountSyp), campaignId: row.campaignId,
+          id: row.id, kind: row.kind as (typeof marketerKinds)[number], amountSyp: toMoneyJsonInteger(row.amountSyp), campaignId: row.campaignId,
           campaignName: row.campaign?.productName ?? null, shopName: row.campaign?.merchant.shopName ?? null,
           createdAt: row.createdAt.toISOString(),
         }));

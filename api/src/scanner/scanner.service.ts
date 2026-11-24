@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { calculateSalePricing, discountedPrice, percentToBasisPoints } from '../campaign/campaign-pricing';
 import { CampaignService } from '../campaign/campaign.service';
 import { IdempotencyService } from '../common/idempotency/idempotency.service';
+import { lockMarketerWallet } from '../common/marketer-wallet';
 import { MAX_MONEY_MINOR_UNITS, toMoneyJsonInteger } from '../common/money';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -204,12 +205,10 @@ export class ScannerService {
   private async lockMarketerWallet(tx: Prisma.TransactionClient, marketerId: string | undefined, commission: bigint) {
     if (commission === 0n) return undefined;
     if (!marketerId) throw passNotFound();
-    const [wallet] = await tx.$queryRaw<{ id: string; availableBalanceSyp: bigint }[]>`
-      SELECT id, available_balance_syp AS "availableBalanceSyp" FROM wallets
-      WHERE user_id = ${marketerId}::uuid AND role = 'marketer' FOR UPDATE
-    `;
-    if (!wallet) throw new Error('Marketer wallet is missing.');
-    if (wallet.availableBalanceSyp + commission > MAX_MONEY_MINOR_UNITS) throw scannerConflict('AMOUNT_OUT_OF_RANGE');
+    const wallet = await lockMarketerWallet(tx, marketerId);
+    if (wallet.availableBalanceSyp + wallet.pendingPayoutSyp + commission > MAX_MONEY_MINOR_UNITS) {
+      throw scannerConflict('AMOUNT_OUT_OF_RANGE');
+    }
     return wallet;
   }
 

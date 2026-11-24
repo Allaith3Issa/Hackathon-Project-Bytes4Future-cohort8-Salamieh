@@ -4,11 +4,11 @@
 
 **Team 3 · PostgreSQL entity-relationship diagram with planned extensions**
 
-One account is uniquely identified by a Syrian mobile number and can hold `customer`, `marketer`, and/or `merchant` roles simultaneously. Customers register once by phone to receive single-use Offer QR codes, pay cash in store, and accumulate cashback unlocked at milestones. Merchants prepay SYP balances via Admin top-ups and lock worst-case reserves per campaign. Marketers earn into one unified wallet and withdraw via Admin-verified Sham Cash transfers with receipt confirmation.
+One account is uniquely identified by a Syrian mobile number and can hold `customer`, `marketer`, and/or `merchant` roles simultaneously. Customers register once by phone to receive single-use Offer QR codes, pay cash in store, and accumulate cashback unlocked at milestones. Merchants prepay SYP balances via Admin top-ups and lock worst-case reserves per campaign. Marketers earn into one marketer-role wallet and can request a simulated withdrawal for Admin review.
 
 Monetary `_syp` columns use integer hundredths of one new Syrian Pound. Existing verified old-SYP integers keep their numeric values. `commission_value` is an integer minor-unit amount when `commission_type = 'fixed'` and a percentage when `commission_type = 'percentage'`. Percentages, counts, and quantities retain their existing units.
 
-The [Prisma schema](../../api/prisma/schema.prisma) and committed [migrations](../../api/prisma/migrations) define the 13 implemented tables. The diagram also retains the planned `CASHBACK_VOUCHERS` and `PAYOUT_REQUESTS` models and their future `MONEY_MOVEMENTS.voucher_id` and `payout_id` links. Store-discount and approval enum values and nullable direct-referral fields exist in PostgreSQL. The full workflows remain deferred.
+The [Prisma schema](../../api/prisma/schema.prisma) and [migrations](../../api/prisma/migrations) define 14 implemented tables, including `PAYOUT_REQUESTS` and its `MONEY_MOVEMENTS.payout_id` link. The diagram retains planned `CASHBACK_VOUCHERS` and the future voucher ledger link. Store-discount and approval enum values and nullable direct-referral fields exist in PostgreSQL. The full workflows remain deferred.
 
 The implemented constraints include one wallet per user and role, one membership per campaign and marketer, one sale per pass, and the two active-pass partial unique indexes below. Composite foreign keys tie a sale to its pass's campaign and customer and to the campaign's merchant. PostgreSQL triggers compare nullable attribution and preserve issued-pass attribution. The migrations also enforce row-level monetary bounds, reserve bounds, sale split reconciliation, and required ledger references. The second migration adds the nullable historical top-up balance snapshot. See the [schema notes](../../api/prisma/README.md) for the SQL details.
 
@@ -31,12 +31,14 @@ erDiagram
     OFFER_QR_PASSES ||--o| SALES : "settles on scan"
     CUSTOMER_PROFILES ||..o{ CASHBACK_VOUCHERS : "redeems unlocked cashback"
     MERCHANT_PROFILES |o..o{ CASHBACK_VOUCHERS : "redeems voucher in store"
-    WALLETS ||..o{ PAYOUT_REQUESTS : "requests withdrawals"
+    USERS ||--o{ PAYOUT_REQUESTS : "requests as marketer"
+    USERS |o--o{ PAYOUT_REQUESTS : "decides as admin"
+    WALLETS ||--o{ PAYOUT_REQUESTS : "holds simulated withdrawals"
     WALLETS |o..o{ MONEY_MOVEMENTS : "posts wallet ledger entries"
     CAMPAIGNS |o..o{ MONEY_MOVEMENTS : "locks and unlocks reserves"
     SALES |o..o{ MONEY_MOVEMENTS : "records 5pct split and commission"
     MERCHANT_TOPUPS |o..o{ MONEY_MOVEMENTS : "records topup credit"
-    PAYOUT_REQUESTS |o..o{ MONEY_MOVEMENTS : "records payout hold and settlement"
+    PAYOUT_REQUESTS |o--o{ MONEY_MOVEMENTS : "records payout hold and terminal movement"
     CASHBACK_VOUCHERS |o..o{ MONEY_MOVEMENTS : "records closed-loop reimbursement"
 
     USERS {
@@ -172,22 +174,13 @@ erDiagram
         uuid id PK
         uuid marketer_id FK
         uuid wallet_id FK
+        enum wallet_role "marketer"
         bigint amount_syp
-        enum method "sham_cash, syriatel_cash, cash"
-        text account_details
-        enum status "pending_review, transferred, confirmed, disputed, rejected"
-        text transfer_reference "nullable"
-        text transfer_receipt_url "nullable"
-        timestamptz transferred_at "nullable"
-        timestamptz confirmed_at "nullable"
-        text dispute_reason "nullable"
-        text rejection_reason "nullable"
-        enum dispute_resolution_outcome "confirm_paid, return_funds, nullable"
-        text dispute_resolution_note "nullable"
-        text reversal_reference "nullable"
-        uuid dispute_resolved_by_admin_id FK "nullable"
-        timestamptz dispute_resolved_at "nullable"
+        enum status "pending_review, confirmed, rejected"
         timestamptz created_at
+        timestamptz decided_at "nullable"
+        uuid decided_by_id FK "nullable"
+        varchar rejection_reason "nullable, 500 characters"
     }
     IDEMPOTENCY_RECORDS {
         uuid actor_id FK
@@ -229,5 +222,12 @@ erDiagram
 - **Joining and self-promotion.** Enforce unique `(campaign_id, marketer_id)` in `CAMPAIGN_MARKETERS`. Block merchants from joining their own campaigns as marketers. The API supports already-stored direct referral codes, whose sales carry zero marketer commission and the 5% platform fee. Issuing and managing merchant direct codes is planned.
 - **Single-use Offer QR and atomic settlement.** A signed-in customer receives an `OFFER_QR_PASSES` entry bound to `(campaign_id, campaign_marketer_id?, customer_id)`. Only the campaign owner may scan it, inside a single DB transaction locking `CAMPAIGNS` before `OFFER_QR_PASSES`. On scan: compute `customer_paid_cash_syp`, `marketer_commission_syp` (`0` if `merchant_direct`), `platform_total_fee_syp = floor(paid * 5 / 100)`, `customer_cashback_syp = floor(paid * 2 / 100)`, and `platform_net_fee_syp = platform_total_fee_syp - customer_cashback_syp`. Deduct `marketer_commission_syp + platform_total_fee_syp` from `CAMPAIGNS.locked_budget_syp`, credit the marketer's wallet immediately, and update `CUSTOMER_PROFILES`. Automatically end the campaign at the applicable cap or expiry and release the unused reserve. For future store discounts, sum `sales.customer_paid_cash_syp` under the campaign lock. Reject a sale that would exceed `max_sales_volume_syp` and keep the pass active. If the sale reaches the cap, close and release in the same transaction.
 - **Cashback milestones.** When `CUSTOMER_PROFILES` reaches both configured thresholds, move `locked_cashback_syp` into `available_cashback_syp` and reset the current milestone counters. The defaults are five purchases and 50,000 minor units (500.00 new SYP). Planned voucher issuance reserves available cashback. Cancellation restores it, and a verified merchant receives the voucher amount on redemption.
+- **Simulated payouts.** Claim or replay the idempotency key, then lock the marketer wallet. Decisions lock the wallet before the payout. A partial unique index on the marketer enforces one pending request. Requests, wallet changes and their ledger movements commit together. Composite keys bind each request to its owner’s marketer wallet and bind linked moves to the same wallet and amount. Checks enforce positive safe amounts, decision metadata and merchant wallets with zero pending payout. Uniqueness per payout and kind plus a partial terminal index allow one hold and at most one refund or completion. History and admin queue indexes support newest-first ordering and status filtering. Pending equals the one held amount or zero. Approval clears pending; rejection returns it to available. Settlement checks available plus pending plus commission under the same marketer wallet lock. Confirmed simulated amounts are reported separately from sale revenue and cash outflows.
 - **Marketer payouts and receipt proof.** In the future payout flow, requesting a payout moves funds from available to pending under a wallet lock. Pre-transfer rejection releases the hold. Recording a transfer clears pending and posts the cash outflow with its receipt and a reference unique per payment method. Confirmation, including automatic confirmation after 72 hours, and disputes update the payout state. Admin dispute resolution records the outcome, admin, note and time. On verified full reversal, log the external cash inflow and restore available funds in one transaction. Keep the original receipt. Lock the payout and any affected wallet and record each financial transition once.
 - **Accounting separation.** The implemented admin revenue reads aggregate net fees and marketer commissions from committed `SALES`. The planned broader overview keeps Merchant Escrow, Locked Campaign Reserves, Marketer Liabilities, Customer Cashback Pool, and Net Platform Fees separate using the ledger and wallet records.
+
+### Payout migration preflight
+
+Before deploying, run `SELECT count(*) FROM wallets WHERE pending_payout_syp <> 0;` on the intended database and verify the result is zero. Stop for manual reconciliation if any balance is unexplained. The migration also fails fast on nonzero values and does not backfill financial history.
+
+From the API directory, with the intended deployment database URL configured securely, run `npx --no prisma migrate deploy --config prisma7.config.ts`. Migration `0003_payout_movement_kinds` commits enum labels before `0004_simulated_marketer_payouts` references them. Apply both before releasing the backend and update all scanner instances before clients start creating payouts.
