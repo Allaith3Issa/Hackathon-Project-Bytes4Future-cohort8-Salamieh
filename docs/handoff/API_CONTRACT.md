@@ -203,6 +203,62 @@ type MarketerMembership = Membership & { campaign: Campaign; referralUrl: string
 type MerchantParticipant = Membership & { marketerId: string; name: string; stats: MarketerStats };
 ```
 
+### Merchant product image upload
+
+`POST /api/v1/merchant/uploads/image` accepts one `multipart/form-data` file part named `file`. It requires a Bearer access token for a verified merchant. It returns `201` with exactly `{ "imageUrl": "https://ik.imagekit.io/your-imagekit-id/mardood/products/example.webp" }` and `Cache-Control: no-store`. The URL uses the server’s configured delivery endpoint.
+
+The input cap is **500,000 bytes**. The API accepts static JPEG, PNG and WebP and checks the decoded format and pixels. It rejects malformed images, MIME mismatches, SVG, GIF and multi-frame images. It limits decoded images to 16,000,000 pixels, applies EXIF orientation, strips source metadata and encodes a transparent-capable WebP. The initial maximum edge is 1,200 px without upscaling. Encoding starts at quality 80, with bounded fallback to lower quality and a smaller edge. The output cap is also **500,000 bytes**.
+
+| Status | Domain code | Meaning |
+| --- | --- | --- |
+| 400 | `VALIDATION_ERROR` | Missing file, extra field or file, invalid multipart, corrupted image, or MIME/content mismatch |
+| 401 | `AUTH_REQUIRED`, `SESSION_EXPIRED` | Bearer authentication failed |
+| 403 | `FORBIDDEN`, `MERCHANT_NOT_VERIFIED` | Merchant role or verification required |
+| 413 | `IMAGE_TOO_LARGE` | Input bytes, decoded pixels or processed output exceed the limit |
+| 415 | `UNSUPPORTED_IMAGE_FORMAT` | Unsupported MIME type or multi-frame image |
+| 429 | `RATE_LIMITED` | More than 10 upload attempts per merchant per minute on this API instance |
+| 502 | `IMAGE_UPLOAD_FAILED` | ImageKit failed, timed out, or returned an unexpected delivery URL |
+| 503 | `IMAGE_UPLOAD_UNAVAILABLE` | Upload configuration is incomplete |
+
+**Configuration.** Set `IMAGEKIT_PRIVATE_KEY` and `IMAGEKIT_URL_ENDPOINT` from the same ImageKit account on the API server in Render, or privately in the local API environment. `IMAGEKIT_PUBLIC_KEY` is optional and unused by this server-side integration. Missing configuration leaves existing APIs available. Complete settings are validated at startup. Credentials stay on the server. The API writes public, uniquely named WebP assets under `/mardood/products/` and verifies the returned URL. Images are processed in memory. The per-merchant limit uses process-local storage and applies independently on each API instance.
+
+Use the returned HTTPS URL as `imageUrl` in the existing campaign launch request. Existing external image URLs remain supported. Render the public ImageKit URL with the existing image component. If Web uses `next/image` for product images, its `remotePatterns` must match the configured delivery hostname and base path followed by `/mardood/products/**`. Upload and campaign launch are separate operations. Retries after an uncertain upload, abandoned drafts, and image replacement can leave unused assets. The MVP has no automatic deletion or cleanup.
+
+**Client preparation.** Select a local JPEG, PNG or WebP. Offer browser capture where supported and both camera and gallery on Expo. Resize the longest edge to at most 1,200 px while maintaining aspect ratio and avoiding upscaling. Start at quality 80%, target 150–300 KB, preserve transparency when needed, and reject client output over 500,000 bytes. Show a local preview before upload. Handle picker cancellation, compression errors and upload/network failures. Let users retry or replace the image. Do not submit a campaign using a local file URI.
+
+```bash
+curl --fail-with-body 'https://api.example.com/api/v1/merchant/uploads/image' \
+  -H 'Authorization: Bearer REPLACE_WITH_MERCHANT_ACCESS_TOKEN' \
+  -F 'file=@./product.webp;type=image/webp'
+```
+
+**Next.js.** `browser-image-compression` can prepare a `File` in the browser. Pass that file to a Next.js Server Action or Route Handler, and forward it using the existing server-side merchant session. Example forwarding on the server:
+
+```ts
+const body = new FormData();
+body.append("file", compressedFile, compressedFile.name);
+const response = await fetch(`${apiV1Base}/merchant/uploads/image`, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${serverAccessToken}` },
+  body,
+});
+```
+
+**Expo.** Install compatible SDK 58 packages when implementing the client. Use `expo-image-picker` with `launchImageLibraryAsync` or camera permissions and `launchCameraAsync`. Use `ImageManipulator.manipulate(asset.uri)`, call `resize` with the calculated smaller dimensions if needed, then `renderAsync` and `saveAsync({ compress: 0.8, format: SaveFormat.WEBP })`. Preview the saved URI and verify its actual byte size before posting with the signed-in session.
+
+```ts
+const body = new FormData();
+body.append("file", { uri: compressedUri, name: "product.webp", type: "image/webp" } as unknown as Blob);
+const response = await fetch(`${apiV1Base}/merchant/uploads/image`, {
+  method: "POST",
+  headers: { Authorization: `Bearer ${accessToken}` },
+  body,
+});
+```
+
+In both examples, let the HTTP client generate the multipart `Content-Type` and boundary. Inspect `response.ok` and map the API error code before using the returned URL. See the [Expo SDK 58 ImagePicker](https://docs.expo.dev/versions/v58.0.0/sdk/imagepicker/), [ImageManipulator](https://docs.expo.dev/versions/v58.0.0/sdk/imagemanipulator/) and [Next.js image host policy](https://nextjs.org/docs/messages/next-image-unconfigured-host).
+
+
 ## Public offers, Customer QR passes & Cashback
 
 Public offer resolution and click tracking, Offer QR issuance, and customer cashback and purchase reporting are implemented. The three `/customer/cashback-vouchers` operations are the deferred first extension. The API can resolve a persisted direct referral code. Merchant-facing direct link creation and management are deferred. Public offer reads currently return `404 NOT_FOUND` for ended or expired offers as well as unknown codes. See [open integration items](IMPLEMENTATION_STATUS.md#pending-and-deferred-audit-items).
