@@ -6,8 +6,83 @@
 
 ## 1. Current Status
 
-- **Current Phase**: **Bugfix Remediation Phase — All Prompts 1–10 Complete (`H2`–`H7` in `BUGFIX_TRACKER.md` + Final Codebase Audit)**.
-- **Last Completed Action (Bugfix Prompt 10 — Merchant Workspace Fixes, Scanner Safety & Final Audit)**:
+- **Current Phase**: **Merchant Campaign Image Upload — Expo SDK 58 `FormData` `XMLHttpRequest` Multipart Transport & Error Classification Fix Complete**.
+- **Last Completed Action (Campaign Image Multipart Upload XHR & Error Classification Fix — Mobile Only)**:
+  - **1. Native `XMLHttpRequest` Multipart Path (`src/core/api/client.ts`)**:
+    - Routed `isFormData === true` requests inside `executeRawFetch` through internal `executeMultipartXhr(...)` using `XMLHttpRequest` instead of Expo SDK 58's WinterCG `expo/fetch` (whose `convertFormDataAsync` rejects React Native `{ uri, name, type }` `FormData` parts with `Unsupported FormDataPart implementation`).
+    - Passed `Accept`, `Authorization`, and `Idempotency-Key` headers while stripping any manual `Content-Type` header so Android/OkHttp generates `multipart/form-data; boundary=...` automatically; preserved `timeoutMs` (`xhr.timeout` + `timeoutMs + 500` safety timer), `externalSignal` (`AbortSignal`), `HttpResponseLike` adapter compatibility, and `401` single-flight refresh retries (`runSingleFlightRefresh()`).
+  - **2. Refined Abort vs Network vs Client Error Classification (`src/core/api/client.ts`)**:
+    - Separated external `AbortSignal` cancellations (`createAbortError()`, `name: 'AbortError'`) from genuine timeouts/network failures (`NETWORK_ERROR`), added `isLikelyFetchNetworkError` (matching Expo `FetchError` / `fetch failed:` and non-`unsupported` `TypeError`s), and stopped masking non-network `FormData`/`BodyInit` errors as `NETWORK_ERROR`.
+  - **3. Hardened Image `FormData` Asset Normalization (`src/features/merchant/campaigns/api.ts`)**:
+    - Validated non-empty trimmed `uri` (`ApiClientError(400, 'VALIDATION_ERROR', ...)`), normalized MIME (`'image/jpg'` / empty -> `'image/jpeg'`) and fallback filename, and appended strictly the single `'file'` part (`{ uri, name, type }`) compatible with `POST /merchant/uploads/image` (`api/` & `sandboxAdapter.ts`).
+- **Prior Completed Action (Campaign Image Local File Byte-Size Fix — Mobile Only)**:
+  - **1. SDK 58 `expo-file-system` Dependency (`package.json`, `package-lock.json`)**:
+    - Restored `node_modules/` via `npm ci` and declared `"expo-file-system": "~58.0.14"` via `npx expo install expo-file-system` (matching `expo` `~58.0.26` with zero manual edits to `android/` or `ios/`).
+  - **2. Local File Size Measurement, Reason Classification & Cache Cleanup (`src/features/merchant/campaigns/imageUpload.ts`, `index.ts`)**:
+    - Replaced React Native `fetch(file://...)` + `response.blob()` inside `readLocalFileByteSize` with zero-copy native `new File(uri)` (`file.exists` / `file.size`) from `expo-file-system`, plus an `AbortSignal`-aware `XMLHttpRequest` (`responseType = 'blob'`) fallback for non-`file://` URIs (`content://`, `blob:`) accepting `status === 0` or `2xx` and closing blobs after reading `size`.
+    - Added typed `CampaignImageCompressionFailureReason` (`'SIZE_LIMIT_EXCEEDED' | 'FILE_READ_FAILED' | 'PROCESSING_FAILED'`) on `CampaignImageCompressionError` (exported via `index.ts`), wrapped `ImageManipulator` failures cleanly as `'PROCESSING_FAILED'`, and cleaned up superseded/oversized temporary cache files via `File.delete()`.
+  - **3. Bilingual Error Mapping Separation (`src/core/i18n/{types,ar,en}.ts`, `src/features/merchant/campaigns/hooks.ts`)**:
+    - Added `merchant.createCampaign.imageReadFailedError` across `types.ts`, `ar.ts`, and `en.ts` (`502 === 502` parity).
+    - Updated `runCompressAndUpload` in `hooks.ts` so `imageCompressionFailedError` is shown **only** when `err.reason === 'SIZE_LIMIT_EXCEEDED'`, while local read/processing failures map to `imageReadFailedError`.
+- **Prior Completed Action (Marketer Simulated Payouts Integration — Phases 1–5)**:
+  - **1. Error Mapping & Bilingual Dictionaries (`src/core/api/errors.ts`, `src/core/i18n/{types,ar,en}.ts`)**:
+    - Added `'PAYOUT_ALREADY_PENDING'` and `'PAYOUT_AMOUNT_CHANGED'` to `KNOWN_ERROR_CODES`, `ApiErrorCodeKey`, and bilingual `errors` dictionaries (`ar.ts` & `en.ts`).
+    - Added full bilingual `wallet.*` payout copy (summary card label, request action, confirmation modal, conflict/amount-changed/already-pending notices, status filters, status badges, rejection reason label, and empty/error states).
+  - **2. Payout Types, API Client & Dev Sandbox Parity (`src/features/marketer/wallet/{types,api,index}.ts`, `src/core/dev/sandboxAdapter.ts`)**:
+    - Extended `MarketerWallet` with `totalConfirmedPaidOutSyp` and added `PayoutStatus`, `MarketerPayout`, `CreateMarketerPayoutInput`, and `FetchMarketerPayoutsParams` matching `api/src/payout/payout.dto.ts`.
+    - Implemented `fetchMarketerPayouts` (`GET /marketer/payouts`) and `requestMarketerPayout` (`POST /marketer/payouts` expecting `expectedAmountSyp` and `201`), plus full per-account simulated payout state, hold/confirm/reject ledger parity, and `409 PAYOUT_ALREADY_PENDING` / `409 PAYOUT_AMOUNT_CHANGED` validation in `src/core/dev/sandboxAdapter.ts`.
+  - **3. SWR Cache Sync, Paginated Payouts Hook & Mutation Hook (`src/features/marketer/wallet/{hooks,index}.ts`)**:
+    - Added `getMarketerPayoutsCachePrefix`, `getMarketerPayoutsCacheKey`, and non-destructive `syncMarketerPayoutCaches` (`swrCache.markStale` / `swrCache.markStalePrefix`).
+    - Implemented `useMarketerPayouts` (status-filtered pagination, `AbortController`, `inFlightPagesRef`, `applyFirstPageSnapshot`) and `useRequestMarketerPayout` (`isSubmittingRef`, `isMountedRef`, `sessionEpoch`, `409` conflict recovery + immediate wallet revalidation, `201` list prepend + silent background sync).
+  - **4. Marketer Wallet UI (`src/app/marketer/(tabs)/wallet.tsx`)**:
+    - Added `wallet-confirmed-paid-out-card` (`totalConfirmedPaidOutSyp`), `BalanceCard.action` states (CTA button / high-contrast `pending_review` notice / zero-balance disabled state), dismissible `marketer-payout-created-banner`, `Modal` confirmation registered with `useOverlayBackRegistration` + `useAndroidBack`, and a 4th `'payouts'` sub-tab with `2×2` wrapping tab bar, `Radii.control` status filters, and rejection reason callouts (zero Admin UI added).
+  - **5. Obsolete Contract Cleanup & Documentation Sync (Phase 5)**:
+    - Removed obsolete `'payout_transfer_reversal'` across `wallet/types.ts`, `wallet.tsx`, `src/core/i18n/{types,ar,en}.ts`, and `src/core/dev/sandboxAdapter.ts` (`0` remaining matches in `src/`) to match the 4 backend `marketerKinds` in `api/src/reporting/dto/marketer-reporting.dto.ts`.
+    - Updated `HANDOVER.md` and `ROADMAP.md` (`4.2`) while keeping real transfers (Sham Cash receipts/confirm/dispute) and `GET /public/leaderboard` in Backlog.
+- **Prior Completed Action (Image Upload Phase 5 — Create Campaign UI, i18n Cleanup & Final Gate)**:
+  - **1. Product Image UI (`src/app/merchant/campaigns/new.tsx`)**:
+    - Removed `imageUrlRef` and manual `<AppInput testID="campaign-image-url-input" />`, replacing them inside `formCard` with a `design.md`-compliant «صورة المنتج / Product image» section featuring `>= 48dp` Gallery & Camera `AppButton` actions (`campaign-image-gallery-button`, `campaign-image-camera-button`), `expo-image` preview (`campaign-image-preview`) with reduced-motion transition, compression/upload `ActivityIndicator` (`campaign-image-status-loading`), `StatusBadge` `'success'` indicator (`campaign-image-status-uploaded`), error banner with Retry & Open Settings (`campaign-image-retry-button`, `campaign-image-open-settings-button`), Remove action (`campaign-image-remove-button`), inline `fieldErrors.imageUrl`, and verified-merchant hint.
+    - Updated `isSubmitDisabled` to require `!isImageBusy && Boolean(draft.imageUrl.trim())` while keeping `useAndroidBack({ enabled: isFocused, isBusy: isLaunching, isRootTab: false })`.
+  - **2. Validation & i18n Cleanup (`src/features/merchant/campaigns/validation.ts`, `src/core/i18n/{types,ar,en}.ts`)**:
+    - Replaced obsolete `imageUrlTooLong` and `imageUrlInvalid` validation fallbacks with `t.errors.IMAGE_UPLOAD_FAILED` and removed all 5 obsolete manual-URL keys (`imageUrlLabel`, `imageUrlPlaceholder`, `imageUrlRequired`, `imageUrlInvalid`, `imageUrlTooLong`) across `types.ts`, `ar.ts`, and `en.ts` (`473 === 473` parity, 0 leftover references).
+- **Prior Completed Action (Image Upload Phase 4 — Hook & Validation Logic)**:
+  - **1. Validation Update (`src/features/merchant/campaigns/validation.ts`)**:
+    - Kept `imageUrl: string` in `CampaignDraftFormInput` and `LaunchCampaignInput` to preserve `POST /merchant/campaigns` payload compatibility, switched empty `trimmedImageUrl` error to `t.merchant.createCampaign.imageRequiredError`, and preserved `MAX_CAMPAIGN_IMAGE_URL_LENGTH` + `isSafeHttpUrl` defense-in-depth checks.
+  - **2. Create Campaign Hook Orchestration (`src/features/merchant/campaigns/hooks.ts`, `index.ts`)**:
+    - Added and exported `CampaignImageUploadStatus` (`'idle' | 'compressing' | 'uploading' | 'uploaded' | 'error'`) and `CampaignImagePermissionType` (`'gallery' | 'camera'`).
+    - Added `selectedImageUri`, `imageUploadStatus`, `imageUploadError`, `imagePermissionDenied`, `isImageBusy`, `pickCampaignImageFromGallery()`, `captureCampaignImageWithCamera()`, `retryImageUpload()`, and `removeCampaignImage()` with SDK 58 `mediaTypes: ['images']`, permission checks, verified-merchant check, `AbortController` + `uploadSeqRef` race fencing, `isMountedRef` unmount cleanup, `idempotencySlotRef` resets on any `updateField` or image change, and `isImageBusy` guard inside `submit()`.
+- **Prior Completed Action (Image Upload Phase 3 — Compression, Upload API & Sandbox)**:
+  - **1. SDK 58 Iterative Compression Service (`src/features/merchant/campaigns/imageUpload.ts`, `index.ts`)**:
+    - Implemented `compressCampaignImageForUpload(uri, signal?)` using SDK 58 `ImageManipulator.manipulate(uri, { maxWidth, maxHeight })` + `ImageManipulatorContext.renderAsync()` + `ImageRef.saveAsync({ format: SaveFormat.JPEG, compress })` (non-deprecated API, explicit `.release()` cleanup, and never upscaling smaller images).
+    - Applied iterative resize/quality ladder (`1200@0.80` -> `1200@0.65` -> `1000@0.55` -> `800@0.45`) with `readLocalFileByteSize` (`fetch` + `Blob.size`) targeting `SAFE_CLIENT_IMAGE_BYTES = 490_000` (hard cap `MAX_BACKEND_IMAGE_BYTES = 500_000`), throwing `CampaignImageCompressionError` if still oversized or `AbortError` when canceled.
+  - **2. Upload API Helper (`src/features/merchant/campaigns/api.ts`, `index.ts`)**:
+    - Implemented and exported `uploadMerchantCampaignImage(asset, signal?)` building a strict single-part `FormData` (`'file'` field only with `{ uri, name, type }`) and calling `POST /merchant/uploads/image` with `auth: true`, `signal`, and `timeoutMs: 30_000`.
+  - **3. Dev Sandbox Endpoint (`src/core/dev/sandboxAdapter.ts`)**:
+    - Added `POST /merchant/uploads/image` enforcing `merchant` role, `verificationStatus === 'verified'` (`403 MERCHANT_NOT_VERIFIED`), React Native `getParts()` / standard `entries()` single `'file'` validation (`400 VALIDATION_ERROR`), `500_000`-byte cap (`413 IMAGE_TOO_LARGE`), and static `image/jpeg | image/png | image/webp` MIME validation (`415 UNSUPPORTED_IMAGE_FORMAT`).
+- **Prior Completed Action (Image Upload Phase 2 — Network Multipart & Dictionaries)**:
+  - **1. Multipart `FormData` Support (`src/core/api/client.ts`)**:
+    - Updated `executeRawFetch` to detect `options.body instanceof FormData`, omit manual `Content-Type: application/json` (letting React Native inject the `multipart/form-data; boundary=...` header automatically), and pass the `FormData` instance directly to `fetch` without `JSON.stringify`, while preserving `Authorization: Bearer`, custom `timeoutMs`, and `401` single-flight refresh retry.
+  - **2. Media Error Codes (`src/core/api/errors.ts`, `src/core/i18n/{types,ar,en}.ts`)**:
+    - Added `'IMAGE_TOO_LARGE'`, `'UNSUPPORTED_IMAGE_FORMAT'`, `'IMAGE_UPLOAD_FAILED'`, and `'IMAGE_UPLOAD_UNAVAILABLE'` to `KNOWN_ERROR_CODES`, `ApiErrorCodeKey`, and localized `errors` dictionaries (`ar.ts` & `en.ts`).
+  - **3. Campaign Product Image Keys (`src/core/i18n/{types,ar,en}.ts`)**:
+    - Added 17 localized `merchant.createCampaign.*` keys covering gallery/camera selection, compression/upload progress, errors, permission prompts, and verified-merchant gating (keeping legacy `imageUrl*` keys temporarily until Phase 5 removes `campaign-image-url-input` in `new.tsx`).
+- **Prior Completed Action (Image Upload Phase 1 — Packages & CNG Config Plugin)**:
+  - **1. SDK 58 Dependencies (`package.json`, `package-lock.json`)**:
+    - Restored `node_modules/` via `npm ci` and installed `expo-image-picker` (`~58.0.10`) and `expo-image-manipulator` (`~58.0.16`) via `npx expo install expo-image-picker expo-image-manipulator`.
+    - Verified installed SDK 58 `.d.ts` definitions: `expo-image-picker` uses `MediaType[]` (`['images']`, `MediaTypeOptions` deprecated) and `ImagePicker.launchImageLibraryAsync` / `launchCameraAsync`; `expo-image-manipulator` exposes `ImageManipulator.manipulate(...)` + `ImageManipulatorContext` (`manipulateAsync` deprecated) and `SaveFormat.JPEG`.
+  - **2. CNG Permissions Plugin (`app.json`)**:
+    - Added `"expo-image-picker"` plugin with Arabic `photosPermission`, unified Arabic `cameraPermission` compatible with `expo-camera`, and `microphonePermission: false` (blocking `RECORD_AUDIO` consistently with `expo-camera`'s `recordAudioAndroid: false`), with zero manual edits to `android/` or `ios/`.
+- **Prior Completed Action (Mobile Logout Concurrency Gate & Refresh-Before-Revoke Fix)**:
+  - **1. Sign-Out Refresh Gate (`src/core/api/{client,index}.ts`)**:
+    - Added epoch-scoped `activeSignOutEpoch` and `pendingSignOutBlockEpoch` with `holdSignOutBlockingRefresh`, `beginSignOutGate`, `endSignOutGate`, `isSignOutInProgress`, and bounded `awaitActiveRefresh(timeoutMs)` (race-safe with guaranteed `clearTimeout` cleanup).
+    - Guarded `runSingleFlightRefresh()` to return `null` immediately when `isSignOutInProgress()` is true, and guarded `clearAuthAndCache()` so background `401` failures during sign-out cannot bump `sessionEpoch`, wipe tokens early, or fire `sessionExpiredListener`.
+    - Updated `bumpSessionEpoch()` to clear both gate epochs automatically so any fresh `establishSession()` resets the gate without blocking subsequent refreshes.
+  - **2. Coordinated `signOut()` & Isolated Refresh (`src/core/auth/AuthContext.tsx`, `src/features/auth/{api,hooks,index}.ts`)**:
+    - `signOut()` calls `holdSignOutBlockingRefresh()`, safely awaits any already-in-flight refresh via `awaitActiveRefresh(4_000)`, verifies `getSessionEpoch() === preSignOutEpoch`, then acquires `logoutEpoch = beginSignOutGate()` and revokes either the `preRefreshed` tokens or `SecureStore` tokens (`logoutSession` -> fallback to `refreshAuthSession` + rotated tokens on expired/missing AT), clearing local `SecureStore`/cache in `finally` only when `getSessionEpoch() === logoutEpoch`.
+    - Added pure-TS `isAccessTokenExpired` JWT `exp` check, `timeoutMs` option on `logoutSession`, `refreshAuthSession` helper, and `isMountedRef` unmount guard in `useSignOut`.
+  - **3. Dev Sandbox Parity (`src/core/api/client.ts`, `src/core/dev/sandboxAdapter.ts`)**:
+    - Forwarded `bearerToken` into `handleSandboxRequest` (`SandboxRequestOptions`) and updated sandbox `POST /auth/logout` to resolve `options?.bearerToken ?? tokenStorage.getAccessToken()`, validate access/refresh tokens, and revoke both consistently with `api/src/auth/auth.service.ts`.
+- **Prior Completed Action (Bugfix Prompt 10 — Merchant Workspace Fixes, Scanner Safety & Final Audit)**:
   - **1. `markStale` Revalidation & Focus Concurrency Guards (`H2`, `src/core/cache/swrCache.ts`, `src/features/{merchant,customer,marketer,profile}/**/hooks.ts`)**:
     - Replaced `swrCache.invalidate` / `invalidatePrefix` after campaign launch, close, and QR settlement (`invalidateMerchantCampaignRelatedCaches`, `invalidateMerchantPostRedeemCaches`) with `swrCache.markStale` / `swrCache.markStalePrefix` so mounted tabs keep cached UI visible instead of freezing on Skeletons.
     - Added `swrCache.isRevalidating(key)` and updated all `useFocusEffect` hooks across merchant, customer, marketer, and profile slices from `!== null` to `(!snapshot || !snapshot.isFresh)` gated by `!swrCache.isRevalidating(key)` or `!inFlightPagesRef.current.has(1)`.
@@ -195,8 +270,8 @@
 
 ## 2. Project File & Cleanup Status
 
-- **Completed (Code — Phase 0 + Phase 1 + Phase 1.5 + Phase 2.0–2.5 + Phase 3.1 + Pre-Build Audit)**:
-  - Governance & tracking docs: `AGENTS.md`, `ROADMAP.md`, `HANDOVER.md`, `README.md`, `eas.json`, `.env.example`, `app.json` (with `expo-camera` CNG plugin).
+- **Completed (Code — Phase 0 + Phase 1 + Phase 1.5 + Phase 2.0–2.5 + Phase 3.1 + Pre-Build Audit + Image Upload Phases 1–5)**:
+  - Governance & tracking docs: `AGENTS.md`, `ROADMAP.md`, `HANDOVER.md`, `README.md`, `eas.json`, `.env.example`, `app.json` (with `expo-camera`, `expo-image-picker`, and `@react-native-community/datetimepicker` CNG plugins).
   - Assets: `assets/fonts/IBMPlexSansArabic-{Regular,SemiBold,Bold}.ttf` + verified Mardood logo, splash, and adaptive icon PNGs in `assets/images/`.
   - Core modules: `theme/`, `i18n/`, `rtl/` (Minor-Unit `BigInt` formatter & parser), `config/`, `auth/` (dual-role guards + SecureStore `activeRole`), `api/` (`idempotency.ts` + expanded `errors.ts` + dual-role refresh), `cache/` (`${userId}:${role}:...` namespace isolation), `navigation/` (`useAndroidBack`, `useOverlayBackRegistration`), `dev/` (offline-only sandbox gated by `__DEV__ && EXPO_PUBLIC_USE_DEV_SANDBOX === 'true'`).
   - UI primitives: `src/components/ui/` (`AppButton`, `AppInput`, `BalanceCard`, `BrandMark`, `BrandSplashOverlay`, `CampaignCard`, `StatusBadge` with `forceLtr`, `SkeletonBlock`, `CampaignCardSkeleton`, `index.ts`).
@@ -204,7 +279,7 @@
   - Routes & UI Primitives: `src/components/ui/QrCodeBox.tsx`, `src/app/_layout.tsx` (5 `Stack.Protected` guards + `r/[code]`), `src/app/index.tsx`, `src/app/r/[code].tsx`, `src/app/workspace-select.tsx`, `src/app/(auth)/{_layout,login,register}`, `src/app/customer/{_layout,(tabs)/{_layout,index,cashback,purchases,profile}}`, `src/app/marketer/{_layout,(tabs)/{_layout,index,wallet,profile},campaigns/[id]}`, `src/app/merchant/{_layout,(tabs)/{_layout,index,campaigns,scanner,wallet,profile},campaigns/{new,[id]}}`. (`src/app/(auth)/index.tsx`, `src/app/(marketer)/`, and `src/app/(merchant)/` removed).
 - **Remaining (Phase 3.2.4 UI)**: None — all 4 Customer tabs (`Offers`, `Cashback`, `Purchases`, `Profile`) are complete.
 - **Remaining (Phase 4 — Waiting on Backend)**:
-  - Phase 4.1, 4.2 & 4.3 backlog endpoints (`/marketer/payouts*`, `/public/leaderboard`, store discounts, `/customer/cashback-vouchers*`, participant approvals).
+  - Phase 4.1, 4.2 & 4.3 backlog endpoints (real Sham Cash transfers/receipts/confirm/dispute, `/public/leaderboard`, store discounts, `/customer/cashback-vouchers*`, participant approvals).
 
 ## 3. Backend API Wiring Matrix (`api/src/` & `../Hacjathon file/docs/handoff/API_CONTRACT.md`)
 
@@ -221,9 +296,10 @@
 | `GET /campaigns`, `GET /marketer/memberships` | Ready | Complete (`Phase 1.2`) | Isolated in `src/features/marketer/campaigns/` & `${userId}:marketer:...` |
 | `GET /campaigns/:campaignId`, `/membership` | Ready | Complete (`Phase 1.3`) | Guarded route `/marketer/campaigns/[id]` |
 | `POST /marketer/campaigns/:campaignId/join` | Ready | Complete (`Phase 1.3`) | `Set` dedupe, rollback, native `Share.share` + clipboard |
-| `GET /marketer/wallet` | Ready | Complete (`Phase 1.4` + `3.1`) | `${userId}:marketer:wallet:summary`; separated available, pending payout & total earned |
+| `GET /marketer/wallet` | Ready | Complete (`Phase 1.4` + `3.1`) | `${userId}:marketer:wallet:summary`; separated available, pending payout, total earned & `totalConfirmedPaidOutSyp` |
 | `GET /marketer/wallet/transactions`, `/by-merchant`, `GET /marketer/stats` | Ready (`marketer-reporting.controller.ts`) | Complete (`Phase 3.1`) | `${userId}:marketer:wallet:{stats,by-merchant,transactions}` with sub-tabs & pagination |
-| `/marketer/payouts*`, `GET /public/leaderboard` | Not in `api/src/` yet | Backlog (`Phase 4.2`) | Blocked on backend implementation |
+| `POST /marketer/payouts`, `GET /marketer/payouts` | Ready (`payout.controller.ts`) | Complete (`Simulated Payouts Phases 1–5`) | `expectedAmountSyp` confirmation modal (`409` balance-changed / already-pending recovery), SWR stale sync, paginated `'payouts'` sub-tab with status filters & rejection reason display |
+| `GET /public/leaderboard` (and real Sham Cash transfer receipts/confirm/dispute) | Not in `api/src/` yet | Backlog (`Phase 4.2`) | Blocked on backend implementation |
 
 ### C. Merchant Workspace (`merchant/`)
 | Endpoint | Backend (`api/src/`) | Mobile Status | Notes |
@@ -234,6 +310,7 @@
 | `POST /merchant/campaigns/:campaignId/close` | Ready (`merchant-campaign.controller.ts`) | Complete (`Phase 2.3`) | Explicit confirm modal, `Set` dedupe & cross-cache release invalidation |
 | `POST /merchant/campaigns/preview` | Ready (`merchant-campaign.controller.ts`) | Complete (`Phase 2.4`) | Debounced `AbortController` live preview (`product` + `fixed` commission) |
 | `POST /merchant/campaigns` | Ready (`merchant-campaign.controller.ts`) | Complete (`Phase 2.4`) | Verified merchant + payload-bound `Idempotency-Key` UUID v4 + cross-cache invalidation |
+| `POST /merchant/uploads/image` | Ready (`media.controller.ts`) | Complete (`Image Upload Phases 1–5` + `File.size` & XHR `FormData` Fixes) | Gallery/Camera via `expo-image-picker`, iterative JPEG compression (`<= 490,000` bytes) via `expo-image-manipulator`, `expo-file-system` `File.size` + XHR fallback, native `XMLHttpRequest` multipart `'file'` upload (bypassing SDK 58 `expo/fetch`), Dev Sandbox parity & UI in `new.tsx` |
 | `POST /merchant/scanner/lookup` | Ready (`scanner.controller.ts`) | Complete (`Phase 2.5`) | Focus-gated `CameraView` + manual input (`OF-DEMO01`), cooldown, permission fallback & cash preview |
 | `POST /merchant/scanner/redeem-offer` | Ready (`scanner.controller.ts`) | Complete (`Phase 2.5`) | `quantity: 1`, code-bound `Idempotency-Key`, full breakdown receipt, auto-close banner & cache invalidation |
 | `POST /merchant/scanner/redeem-voucher`, `preview-offer`, `store_discount`, `participants`, active `directReferralUrl` | Not in `api/src/` yet | Backlog (`Phase 4.1`) | Blocked on backend implementation |
@@ -250,7 +327,47 @@
 
 ## 4. Verification Status
 
-- **Current Verification (Post Bugfix Prompt 10 — Final Codebase Audit)**:
+- **Current Verification (Campaign Image Multipart XHR & Error Classification Fix — Prompt 3 Gate)**:
+  - `npx --yes expo-doctor`: Passed (**20/20 checks passed. No issues detected!**, exit `0`).
+  - `npx tsc --noEmit`: Exited `2` with **0** errors in all modified files (`src/core/api/client.ts`, `src/features/merchant/campaigns/api.ts`); only the `3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`.
+  - Targeted `npx eslint src/core/api/client.ts src/features/merchant/campaigns/api.ts`: Exited `0` with **0** errors (`0` issues in `api.ts`; `2` pre-existing `@typescript-eslint/no-require-imports` warnings remain at `client.ts:469,549` for conditional `__DEV__` sandbox loading).
+  - Full `npx expo lint`: Exited `1` with **35 problems (20 errors, 15 warnings)** — identical to pre-existing baseline (`0` new findings introduced).
+  - Ephemeral `npx --yes tsx` behavioral verification (`client.ts`, `campaigns/api.ts`, `sandboxAdapter.ts`): Passed (`ALL_UNIT_AND_SANDBOX_CHECKS_PASSED` — verified `FormData` -> `XMLHttpRequest` routing without manual `Content-Type`, MIME/filename normalization, `401` single-flight refresh + XHR retry with rotated token, `timeout`/`onerror` -> `NETWORK_ERROR`, `externalSignal.abort()` -> `AbortError`, non-network `TypeError('Unsupported ...')` preserved without `NETWORK_ERROR` masking, genuine `fetch failed:` -> `NETWORK_ERROR`, empty URI -> `400 VALIDATION_ERROR`, and Dev Sandbox `POST /merchant/uploads/image` + `415 UNSUPPORTED_IMAGE_FORMAT` rejection).
+  - Cross-role isolation & backend boundary check: Passed (`0` cross-role imports across `src/features/`; `0` changes inside `api/`).
+- **Prior Verification (Campaign Image Local File Byte-Size Fix)**:
+  - `npx --yes expo-doctor`: Passed (**20/20 checks passed. No issues detected!**, exit `0`).
+  - `npx tsc --noEmit`: Exited `2` with **0** errors in all modified files (`src/features/merchant/campaigns/{imageUpload,hooks,index}.ts`, `src/core/i18n/{types,ar,en}.ts`); only the `3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`.
+  - Targeted `npx eslint` on `src/features/merchant/campaigns/{imageUpload,index}.ts` and `src/core/i18n/{types,ar,en}.ts`: Passed (**0** errors, **0** warnings); in `src/features/merchant/campaigns/hooks.ts`, **0** issues in modified `runCompressAndUpload` lines (`3` pre-existing findings remain on untouched lines `164`, `442`, `1038`).
+  - Full `npx expo lint`: Exited `1` with **35 problems (20 errors, 15 warnings)** — identical to pre-existing baseline (`0` new findings introduced).
+  - `ar.ts` vs `en.ts` dictionary parity & `imageUpload` unit checks (`node`): Passed (**502 === 502** keys, `MISSING_IN_EN=[]`, `MISSING_IN_AR=[]`; verified 3 KB `File.size`, `SIZE_LIMIT_EXCEEDED` temp cleanup, `492 KB` best-candidate retention, `PROCESSING_FAILED`, `FILE_READ_FAILED`, and `content://` XHR `status=0` fallback).
+- **Prior Verification (Marketer Simulated Payouts Integration Phase 5 — Final Gate)**:
+  - `npx --yes expo-doctor`: Passed (**20/20 checks passed. No issues detected!**, exit `0`).
+  - `npx tsc --noEmit`: Exited `2` with **0** errors in all Phases 1–5 modified files (`src/core/api/errors.ts`, `src/core/i18n/{types,ar,en}.ts`, `src/features/marketer/wallet/{types,api,hooks,index}.ts`, `src/core/dev/sandboxAdapter.ts`, `src/app/marketer/(tabs)/wallet.tsx`); only the `3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`.
+  - Targeted `eslint` on all 10 modified files (`src/core/api/errors.ts`, `src/core/i18n/{types,ar,en}.ts`, `src/features/marketer/wallet/{types,api,hooks,index}.ts`, `src/core/dev/sandboxAdapter.ts`, `src/app/marketer/(tabs)/wallet.tsx`): **0** errors and **0** warnings across 9 files and all newly added payout code in `hooks.ts` (`4` pre-existing findings remain in untouched `hooks.ts` lines `337`, `574`, `693`, `930`).
+  - Full `npx expo lint`: Exited `1` with **35 problems (20 errors, 15 warnings)** — identical to pre-existing baseline (`0` new findings introduced across Phases 1–5).
+  - `ar.ts` vs `en.ts` dictionary parity (Node/TypeScript evaluator): Passed (**501 === 501** keys, `MISSING_IN_EN=[]`, `MISSING_IN_AR=[]`).
+  - Cleanup & isolation `grep` across `hackathon-mobile/src/`: Passed (`0` remaining `payout_transfer_reversal` occurrences; `0` cross-role imports between `customer/`, `marketer/`, and `merchant/`; `0` admin routes/imports; `0` `console.log` calls; `0` uncleaned timers).
+- **Prior Verification (Image Upload Phase 5 — Final Gate)**:
+  - `npx --yes expo-doctor`: Passed (**20/20 checks passed. No issues detected!**).
+  - Targeted `npx eslint` on Phase 5 files (`src/features/merchant/campaigns/validation.ts`, `src/core/i18n/{types,ar,en}.ts`, `src/features/merchant/campaigns/{imageUpload,api}.ts`, `src/core/api/errors.ts`, `src/core/dev/sandboxAdapter.ts`): `0` errors and `0` warnings; in `src/app/merchant/campaigns/new.tsx`, `0` issues in all Phase 5 image UI lines (`1` pre-existing `react-hooks/set-state-in-effect` error on untouched `new.tsx:147`).
+  - Full `npx expo lint`: Exited `1` (`35` total problems: `20` errors, `15` warnings — identical to pre-existing baseline, `0` new findings introduced across Phases 1–5).
+  - `npx tsc --noEmit`: Exited `2` with `0` errors in all Phase 1–5 modified files (`3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`).
+  - `ar.ts` vs `en.ts` dictionary parity (`tsx`) & cleanup `grep`: Passed (`473 === 473` keys, `0` missing, `0` leftover `imageUrl*`/`campaign-image-url-input` references, `0` cross-role imports).
+- **Prior Verification (Image Upload Phase 4)**:
+  - `npx eslint src/features/merchant/campaigns/{validation,hooks,index,types}.ts`: `0` errors/warnings across `validation.ts`, `index.ts`, `types.ts`, and all newly added Phase 4 image-upload logic in `hooks.ts` (`3` pre-existing lint findings remain in untouched `hooks.ts` lines `164`, `442`, `1035`).
+  - `npx tsc --noEmit`: `0` errors across `validation.ts`, `hooks.ts`, `index.ts`, `types.ts`, and `new.tsx`; `3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`.
+- **Prior Verification (Image Upload Phase 3)**:
+  - `npx eslint src/features/merchant/campaigns/{imageUpload,api,index}.ts src/core/dev/sandboxAdapter.ts`: Passed (`0` errors, `0` warnings).
+  - `npx tsc --noEmit`: `0` errors across all Phase 3 files (`imageUpload.ts`, `api.ts`, `index.ts`, `sandboxAdapter.ts`); `3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`.
+- **Prior Verification (Image Upload Phase 2)**:
+  - `npx eslint src/core/api/{client,errors,types}.ts src/core/i18n/{types,ar,en}.ts`: Passed (`0` errors; `2` pre-existing `require('../dev')` tree-shaking warnings in `client.ts`).
+  - `ar.ts` vs `en.ts` dictionary parity (`tsx`): Passed (`478 === 478` keys, `0` missing in either locale).
+  - `npx tsc --noEmit`: `0` errors across all Phase 2 files (`src/core/api/*`, `src/core/i18n/*`); `3` pre-existing errors remain in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582`.
+- **Prior Verification (Image Upload Phase 1 — Live `node_modules/` Installed)**:
+  - `npx expo-doctor`: Passed (**20/20 checks passed. No issues detected!**).
+  - `npx tsc --noEmit`: Zero errors on Phase 1 config/package additions; surfaced **3 pre-existing** TypeScript errors in untouched files (`src/app/merchant/(tabs)/scanner.tsx:79,136` for `AppState.currentState` nullable typing, and `src/app/merchant/campaigns/[id].tsx:582` for `Modal` `onRequestClose` returning `boolean`).
+  - `npx expo lint`: Zero issues on Phase 1 changes; surfaced **pre-existing** ESLint findings (`35` problems: `20` errors, `15` warnings, primarily `react-hooks/set-state-in-effect` and `react-hooks/exhaustive-deps` from earlier `node_modules`-less turns).
+- **Prior Verification (Post Bugfix Prompt 10 — Final Codebase Audit)**:
   - TypeScript AST parse check across all `119` files in `hackathon-mobile/src/`: Passed (`0` syntax/parse errors).
   - Cross-role isolation, timer hygiene & log leak audit across `hackathon-mobile/src/`: Passed (`0` cross-imports between `customer`, `marketer`, and `merchant`; `0` `console.log` calls; `0` uncleaned `setTimeout`/`setInterval` timers).
   - Dictionary parity (`ar.ts` vs `en.ts` via `tsx`): Passed (`457 === 457` keys, `0` missing in either locale).
@@ -291,5 +408,6 @@
 
 ## 6. Exact Next Step (Next Prompt)
 
-- **Local Pre-Release Verification & Native Build**:
-  - Run `npm install` inside `hackathon-mobile/`, verify `npx tsc --noEmit`, `npx expo lint`, and `npx expo-doctor`, then proceed with EAS Android Dev Client build (`eas build --profile development --platform android`) and live E2E verification against the backend.
+- **Live Android Development Build & E2E Media Verification**:
+  - Build and install the Expo Dev Client (`eas build --profile development --platform android`) against the live backend (`EXPO_PUBLIC_USE_DEV_SANDBOX=false`), verify gallery picking, live camera capture, client compression (`< 500 KB`), `POST /merchant/uploads/image`, and end-to-end campaign creation on device.
+  - Optional codebase maintenance pass: resolve the `3` pre-existing TypeScript errors in untouched `src/app/merchant/(tabs)/scanner.tsx:79,136` and `src/app/merchant/campaigns/[id].tsx:582` and the baseline `react-hooks/set-state-in-effect` lint findings.

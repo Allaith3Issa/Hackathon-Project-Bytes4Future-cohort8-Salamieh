@@ -58,18 +58,38 @@ export async function fetchCurrentAccount(): Promise<Account> {
 }
 
 /**
+ * POST /api/v1/auth/refresh
+ * Exchanges a refresh token for a rotated AuthSession without triggering
+ * global single-flight cache wipes or session-expired UI notices.
+ */
+export async function refreshAuthSession(
+  refreshToken: string,
+  options?: { timeoutMs?: number },
+): Promise<AuthSession> {
+  return apiRequest<AuthSession>('/auth/refresh', {
+    method: 'POST',
+    auth: false,
+    skipRefreshOn401: true,
+    timeoutMs: options?.timeoutMs,
+    body: { refreshToken },
+  });
+}
+
+/**
  * POST /api/v1/auth/logout
  * Revokes the active refresh token on the server without triggering token refresh on 401.
  */
 export async function logoutSession(
   refreshToken?: string | null,
   accessToken?: string | null,
+  options?: { timeoutMs?: number },
 ): Promise<void> {
   await apiRequest<void>('/auth/logout', {
     method: 'POST',
     auth: true,
     skipRefreshOn401: true,
     bearerToken: accessToken !== undefined ? accessToken : undefined,
+    timeoutMs: options?.timeoutMs,
     body: refreshToken ? { refreshToken } : {},
   });
 }

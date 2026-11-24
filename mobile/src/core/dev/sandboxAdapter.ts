@@ -399,8 +399,7 @@ interface SandboxMarketerTransaction {
     | 'marketer_commission_credit'
     | 'payout_hold'
     | 'payout_release_refund'
-    | 'payout_completed'
-    | 'payout_transfer_reversal';
+    | 'payout_completed';
   amountSyp: number;
   campaignId: string | null;
   campaignName: string | null;
@@ -408,91 +407,233 @@ interface SandboxMarketerTransaction {
   createdAt: string;
 }
 
+type SandboxPayoutStatus = 'pending_review' | 'confirmed' | 'rejected';
+
+interface SandboxMarketerPayout {
+  id: string;
+  amountSyp: number;
+  status: SandboxPayoutStatus;
+  createdAt: string;
+  decidedAt: string | null;
+  rejectionReason: string | null;
+}
+
+interface SandboxMarketerWalletState {
+  availableBalanceSyp: number;
+  pendingPayoutSyp: number;
+  totalEarnedSyp: number;
+  confirmedPaidOutSyp: number;
+  payouts: SandboxMarketerPayout[];
+  transactions: SandboxMarketerTransaction[];
+  byMerchant: SandboxMarketerMerchantEarnings[];
+  statsClicks: number;
+  statsConversionRatePercent: number;
+}
+
 const membershipsByAccountAndCampaign = new Map<string, SandboxMembership>();
-let sandboxBalanceSyp = 10000; // 100.00 new SYP available
-const sandboxMarketerPendingPayoutSyp = 4000; // 40.00 new SYP held for payout review
-const sandboxMarketerConfirmedPaidOutSyp = 12000; // 120.00 new SYP confirmed paid out
+const sandboxMarketerWalletsByAccountId = new Map<string, SandboxMarketerWalletState>([
+  [
+    DEMO_MARKETER_ACCOUNT.id,
+    {
+      availableBalanceSyp: 14000, // 140.00 new SYP ready for simulated payout test
+      pendingPayoutSyp: 0,
+      totalEarnedSyp: 26000, // 260.00 new SYP lifetime commissions
+      confirmedPaidOutSyp: 12000, // 120.00 new SYP confirmed paid out
+      payouts: [
+        {
+          id: '40000000-0000-4000-8000-000000000002',
+          amountSyp: 4000,
+          status: 'rejected',
+          createdAt: '2026-11-22T17:40:00Z',
+          decidedAt: '2026-11-22T18:10:00Z',
+          rejectionReason: 'تم إلغاء الطلب التجريبي لإعادة التجميع مع الدفعة التالية.',
+        },
+        {
+          id: '40000000-0000-4000-8000-000000000001',
+          amountSyp: 12000,
+          status: 'confirmed',
+          createdAt: '2026-11-21T15:00:00Z',
+          decidedAt: '2026-11-21T16:00:00Z',
+          rejectionReason: null,
+        },
+      ],
+      transactions: [
+        {
+          id: 'tx-mkt-006',
+          kind: 'marketer_commission_credit',
+          amountSyp: 10000,
+          campaignId: 'aff111a7-e000-4000-8000-000000000040',
+          campaignName: 'علبة معمول مشكل ١ كغ',
+          shopName: 'مخبز وحلويات السلمية',
+          createdAt: '2026-11-23T08:15:00Z',
+        },
+        {
+          id: 'tx-mkt-005b',
+          kind: 'payout_release_refund',
+          amountSyp: 4000,
+          campaignId: null,
+          campaignName: null,
+          shopName: null,
+          createdAt: '2026-11-22T18:10:00Z',
+        },
+        {
+          id: 'tx-mkt-005',
+          kind: 'payout_hold',
+          amountSyp: 4000,
+          campaignId: null,
+          campaignName: null,
+          shopName: null,
+          createdAt: '2026-11-22T17:40:00Z',
+        },
+        {
+          id: 'tx-mkt-004',
+          kind: 'marketer_commission_credit',
+          amountSyp: 6000,
+          campaignId: '10000000-0000-4000-8000-000000000002',
+          campaignName: 'قهوة عربية محمصة ٥٠٠ غ',
+          shopName: 'محامص الشام',
+          createdAt: '2026-11-22T12:15:00Z',
+        },
+        {
+          id: 'tx-mkt-003',
+          kind: 'payout_completed',
+          amountSyp: 12000,
+          campaignId: null,
+          campaignName: null,
+          shopName: null,
+          createdAt: '2026-11-21T16:00:00Z',
+        },
+        {
+          id: 'tx-mkt-003a',
+          kind: 'payout_hold',
+          amountSyp: 12000,
+          campaignId: null,
+          campaignName: null,
+          shopName: null,
+          createdAt: '2026-11-21T15:00:00Z',
+        },
+        {
+          id: 'tx-mkt-002',
+          kind: 'marketer_commission_credit',
+          amountSyp: 6000,
+          campaignId: '20000000-0000-4000-8000-000000000022',
+          campaignName: 'شال صوف شتوي مطرز',
+          shopName: 'أزياء الريف الدمشقي',
+          createdAt: '2026-11-21T11:20:00Z',
+        },
+        {
+          id: 'tx-mkt-001',
+          kind: 'marketer_commission_credit',
+          amountSyp: 4000,
+          campaignId: 'aff111a7-e000-4000-8000-000000000039',
+          campaignName: 'بقلاوة مشكلة ٥٠٠ غ',
+          shopName: 'مخبز وحلويات السلمية',
+          createdAt: '2026-11-20T14:05:00Z',
+        },
+      ],
+      byMerchant: [
+        {
+          merchantId: 'aff111a7-e000-4000-8000-000000000002',
+          shopName: 'مخبز وحلويات السلمية',
+          salesCount: 2,
+          itemsSold: 2,
+          totalEarnedSyp: 14000,
+        },
+        {
+          merchantId: '20000000-0000-4000-8000-000000000011',
+          shopName: 'محامص الشام',
+          salesCount: 1,
+          itemsSold: 1,
+          totalEarnedSyp: 6000,
+        },
+        {
+          merchantId: '20000000-0000-4000-8000-000000000012',
+          shopName: 'أزياء الريف الدمشقي',
+          salesCount: 1,
+          itemsSold: 1,
+          totalEarnedSyp: 6000,
+        },
+      ],
+      statsClicks: 48,
+      statsConversionRatePercent: 8.33,
+    },
+  ],
+  [
+    DEMO_DUAL_ACCOUNT.id,
+    {
+      availableBalanceSyp: 6000, // 60.00 new SYP
+      pendingPayoutSyp: 4000, // Active pending_review payout seeded for testing PAYOUT_ALREADY_PENDING
+      totalEarnedSyp: 10000,
+      confirmedPaidOutSyp: 0,
+      payouts: [
+        {
+          id: '40000000-0000-4000-8000-000000000009',
+          amountSyp: 4000,
+          status: 'pending_review',
+          createdAt: '2026-11-23T09:00:00Z',
+          decidedAt: null,
+          rejectionReason: null,
+        },
+      ],
+      transactions: [
+        {
+          id: 'tx-dual-002',
+          kind: 'payout_hold',
+          amountSyp: 4000,
+          campaignId: null,
+          campaignName: null,
+          shopName: null,
+          createdAt: '2026-11-23T09:00:00Z',
+        },
+        {
+          id: 'tx-dual-001',
+          kind: 'marketer_commission_credit',
+          amountSyp: 10000,
+          campaignId: 'aff111a7-e000-4000-8000-000000000040',
+          campaignName: 'علبة معمول مشكل ١ كغ',
+          shopName: 'مخبز وحلويات السلمية',
+          createdAt: '2026-11-22T14:00:00Z',
+        },
+      ],
+      byMerchant: [
+        {
+          merchantId: 'aff111a7-e000-4000-8000-000000000002',
+          shopName: 'مخبز وحلويات السلمية',
+          salesCount: 1,
+          itemsSold: 1,
+          totalEarnedSyp: 10000,
+        },
+      ],
+      statsClicks: 16,
+      statsConversionRatePercent: 6.25,
+    },
+  ],
+]);
 
-const sandboxMarketerByMerchant: SandboxMarketerMerchantEarnings[] = [
-  {
-    merchantId: 'aff111a7-e000-4000-8000-000000000002',
-    shopName: 'مخبز وحلويات السلمية',
-    salesCount: 2,
-    itemsSold: 2,
-    totalEarnedSyp: 14000, // 140.00 new SYP
-  },
-  {
-    merchantId: '20000000-0000-4000-8000-000000000011',
-    shopName: 'محامص الشام',
-    salesCount: 1,
-    itemsSold: 1,
-    totalEarnedSyp: 6000, // 60.00 new SYP
-  },
-  {
-    merchantId: '20000000-0000-4000-8000-000000000012',
-    shopName: 'أزياء الريف الدمشقي',
-    salesCount: 1,
-    itemsSold: 1,
-    totalEarnedSyp: 6000, // 60.00 new SYP
-  },
-];
+function getOrCreateMarketerWalletState(accountId: string): SandboxMarketerWalletState {
+  const existing = sandboxMarketerWalletsByAccountId.get(accountId);
+  if (existing) {
+    return existing;
+  }
+  const initial: SandboxMarketerWalletState = {
+    availableBalanceSyp: 0,
+    pendingPayoutSyp: 0,
+    totalEarnedSyp: 0,
+    confirmedPaidOutSyp: 0,
+    payouts: [],
+    transactions: [],
+    byMerchant: [],
+    statsClicks: 0,
+    statsConversionRatePercent: 0,
+  };
+  sandboxMarketerWalletsByAccountId.set(accountId, initial);
+  return initial;
+}
 
-const sandboxMarketerTransactions: SandboxMarketerTransaction[] = [
-  {
-    id: 'tx-mkt-006',
-    kind: 'marketer_commission_credit',
-    amountSyp: 10000,
-    campaignId: 'aff111a7-e000-4000-8000-000000000040',
-    campaignName: 'علبة معمول مشكل ١ كغ',
-    shopName: 'مخبز وحلويات السلمية',
-    createdAt: '2026-11-23T08:15:00Z',
-  },
-  {
-    id: 'tx-mkt-005',
-    kind: 'payout_hold',
-    amountSyp: 4000,
-    campaignId: null,
-    campaignName: null,
-    shopName: null,
-    createdAt: '2026-11-22T17:40:00Z',
-  },
-  {
-    id: 'tx-mkt-004',
-    kind: 'marketer_commission_credit',
-    amountSyp: 6000,
-    campaignId: '10000000-0000-4000-8000-000000000002',
-    campaignName: 'قهوة عربية محمصة ٥٠٠ غ',
-    shopName: 'محامص الشام',
-    createdAt: '2026-11-22T12:15:00Z',
-  },
-  {
-    id: 'tx-mkt-003',
-    kind: 'payout_completed',
-    amountSyp: 12000,
-    campaignId: null,
-    campaignName: null,
-    shopName: null,
-    createdAt: '2026-11-21T16:00:00Z',
-  },
-  {
-    id: 'tx-mkt-002',
-    kind: 'marketer_commission_credit',
-    amountSyp: 6000,
-    campaignId: '20000000-0000-4000-8000-000000000022',
-    campaignName: 'شال صوف شتوي مطرز',
-    shopName: 'أزياء الريف الدمشقي',
-    createdAt: '2026-11-21T11:20:00Z',
-  },
-  {
-    id: 'tx-mkt-001',
-    kind: 'marketer_commission_credit',
-    amountSyp: 4000,
-    campaignId: 'aff111a7-e000-4000-8000-000000000039',
-    campaignName: 'بقلاوة مشكلة ٥٠٠ غ',
-    shopName: 'مخبز وحلويات السلمية',
-    createdAt: '2026-11-20T14:05:00Z',
-  },
-];
+const sandboxPayoutIdempotency = new Map<
+  string,
+  { fingerprint: string; payout: SandboxMarketerPayout }
+>();
 
 let tokenCounter = 1;
 const revokedSandboxTokens = new Set<string>();
@@ -915,6 +1056,7 @@ function computeSandboxProductPreview(params: {
 export interface SandboxRequestOptions {
   idempotencyKey?: string;
   signal?: AbortSignal;
+  bearerToken?: string | null;
 }
 
 function waitSandboxDelay(signal?: AbortSignal): Promise<void> {
@@ -1050,14 +1192,25 @@ export async function handleSandboxRequest<T>(
   }
 
   if (method === 'POST' && pathname === '/auth/logout') {
-    const accessToken = await tokenStorage.getAccessToken();
+    const accessToken =
+      options?.bearerToken !== undefined
+        ? options.bearerToken
+        : await tokenStorage.getAccessToken();
+    const account = resolveAccountFromToken(accessToken, 'access');
+    if (!account) {
+      throw new ApiClientError(401, 'AUTH_REQUIRED', 'Valid authentication is required.');
+    }
     const payload = (body ?? {}) as { refreshToken?: string };
     const refreshToken = payload.refreshToken?.trim();
+    if (refreshToken) {
+      const refreshAccount = resolveAccountFromToken(refreshToken, 'refresh');
+      if (!refreshAccount || refreshAccount.id !== account.id) {
+        throw new ApiClientError(401, 'REFRESH_TOKEN_INVALID', 'Invalid refresh token.');
+      }
+      revokedSandboxTokens.add(refreshToken);
+    }
     if (accessToken) {
       revokedSandboxTokens.add(accessToken);
-    }
-    if (refreshToken) {
-      revokedSandboxTokens.add(refreshToken);
     }
     return undefined as T;
   }
@@ -1257,14 +1410,12 @@ export async function handleSandboxRequest<T>(
       throw new ApiClientError(403, 'FORBIDDEN', 'Marketer role required.');
     }
 
+    const walletState = getOrCreateMarketerWalletState(account.id);
     return {
-      availableBalanceSyp: sandboxBalanceSyp,
-      pendingPayoutSyp: sandboxMarketerPendingPayoutSyp,
-      totalEarnedSyp:
-        sandboxBalanceSyp +
-        sandboxMarketerPendingPayoutSyp +
-        sandboxMarketerConfirmedPaidOutSyp,
-      totalConfirmedPaidOutSyp: sandboxMarketerConfirmedPaidOutSyp,
+      availableBalanceSyp: walletState.availableBalanceSyp,
+      pendingPayoutSyp: walletState.pendingPayoutSyp,
+      totalEarnedSyp: walletState.totalEarnedSyp,
+      totalConfirmedPaidOutSyp: walletState.confirmedPaidOutSyp,
     } as T;
   }
 
@@ -1274,20 +1425,21 @@ export async function handleSandboxRequest<T>(
       throw new ApiClientError(403, 'FORBIDDEN', 'Marketer role required.');
     }
 
-    const totalItemsSold = sandboxMarketerByMerchant.reduce(
+    const walletState = getOrCreateMarketerWalletState(account.id);
+    const totalItemsSold = walletState.byMerchant.reduce(
       (sum, item) => sum + item.itemsSold,
       0,
     );
-    const totalEarned = sandboxMarketerByMerchant.reduce(
+    const totalEarned = walletState.byMerchant.reduce(
       (sum, item) => sum + item.totalEarnedSyp,
       0,
     );
 
     return {
-      clicks: 48,
+      clicks: walletState.statsClicks,
       itemsSold: totalItemsSold,
       earnedSyp: totalEarned,
-      conversionRatePercent: 8.33,
+      conversionRatePercent: walletState.statsConversionRatePercent,
     } as T;
   }
 
@@ -1307,9 +1459,10 @@ export async function handleSandboxRequest<T>(
         ? Math.min(100, parsedPageSize)
         : 20;
 
+    const walletState = getOrCreateMarketerWalletState(account.id);
     const start = (page - 1) * pageSize;
-    const sliced = sandboxMarketerByMerchant.slice(start, start + pageSize);
-    const total = sandboxMarketerByMerchant.length;
+    const sliced = walletState.byMerchant.slice(start, start + pageSize);
+    const total = walletState.byMerchant.length;
     const hasNext = start + pageSize < total;
 
     return {
@@ -1338,9 +1491,171 @@ export async function handleSandboxRequest<T>(
         ? Math.min(100, parsedPageSize)
         : 20;
 
+    const walletState = getOrCreateMarketerWalletState(account.id);
     const start = (page - 1) * pageSize;
-    const sliced = sandboxMarketerTransactions.slice(start, start + pageSize);
-    const total = sandboxMarketerTransactions.length;
+    const sliced = walletState.transactions.slice(start, start + pageSize);
+    const total = walletState.transactions.length;
+    const hasNext = start + pageSize < total;
+
+    return {
+      items: sliced,
+      page,
+      pageSize,
+      total,
+      previousPage: page > 1 ? page - 1 : null,
+      nextPage: hasNext ? page + 1 : null,
+    } as T;
+  }
+
+  if (method === 'POST' && pathname === '/marketer/payouts') {
+    const account = await requireAuthenticatedAccount();
+    if (!account.roles.includes('marketer')) {
+      throw new ApiClientError(403, 'FORBIDDEN', 'Marketer role required.');
+    }
+
+    const idempotencyKey = options?.idempotencyKey?.trim() ?? '';
+    if (!UUID_36_REGEX.test(idempotencyKey)) {
+      throw new ApiClientError(
+        400,
+        'VALIDATION_ERROR',
+        'Valid 36-character UUID Idempotency-Key header is required.',
+      );
+    }
+
+    const payload = (body ?? {}) as { expectedAmountSyp?: unknown };
+    const expectedAmountSyp = payload.expectedAmountSyp;
+    if (
+      typeof expectedAmountSyp !== 'number' ||
+      !Number.isSafeInteger(expectedAmountSyp) ||
+      expectedAmountSyp < 1 ||
+      BigInt(expectedAmountSyp) > MAX_SAFE_MINOR_BIGINT
+    ) {
+      throw new ApiClientError(
+        400,
+        'VALIDATION_ERROR',
+        'expectedAmountSyp must be a positive safe integer.',
+      );
+    }
+
+    const fingerprint = JSON.stringify({ expectedAmountSyp });
+    const idempotencyCacheKey = `${account.id}:${idempotencyKey.toLowerCase()}`;
+    const existingPayout = sandboxPayoutIdempotency.get(idempotencyCacheKey);
+    if (existingPayout) {
+      if (existingPayout.fingerprint !== fingerprint) {
+        throw new ApiClientError(
+          409,
+          'IDEMPOTENCY_KEY_REUSED',
+          'Idempotency-Key reused with different request payload.',
+        );
+      }
+      return existingPayout.payout as T;
+    }
+
+    const walletState = getOrCreateMarketerWalletState(account.id);
+    const hasPendingPayout = walletState.payouts.some(
+      (item) => item.status === 'pending_review',
+    );
+    if (hasPendingPayout || walletState.pendingPayoutSyp > 0) {
+      throw new ApiClientError(
+        409,
+        'PAYOUT_ALREADY_PENDING',
+        'A payout request is already pending.',
+      );
+    }
+
+    if (walletState.availableBalanceSyp <= 0) {
+      throw new ApiClientError(
+        409,
+        'INSUFFICIENT_WALLET_BALANCE',
+        'There is no available balance to withdraw.',
+      );
+    }
+
+    if (walletState.availableBalanceSyp !== expectedAmountSyp) {
+      throw new ApiClientError(
+        409,
+        'PAYOUT_AMOUNT_CHANGED',
+        'The available amount has changed. Refresh the wallet and confirm again.',
+      );
+    }
+
+    const nowIso = new Date().toISOString();
+    const amountSyp = walletState.availableBalanceSyp;
+    const payoutSerial = String(walletState.payouts.length + 101).padStart(12, '0');
+    const createdPayout: SandboxMarketerPayout = {
+      id: `40000000-${account.id.slice(-4)}-4000-8000-${payoutSerial}`,
+      amountSyp,
+      status: 'pending_review',
+      createdAt: nowIso,
+      decidedAt: null,
+      rejectionReason: null,
+    };
+
+    walletState.availableBalanceSyp = 0;
+    walletState.pendingPayoutSyp = amountSyp;
+    walletState.payouts.unshift(createdPayout);
+    walletState.transactions.unshift({
+      id: `tx-mkt-hold-${Date.now()}`,
+      kind: 'payout_hold',
+      amountSyp,
+      campaignId: null,
+      campaignName: null,
+      shopName: null,
+      createdAt: nowIso,
+    });
+
+    sandboxPayoutIdempotency.set(idempotencyCacheKey, {
+      fingerprint,
+      payout: createdPayout,
+    });
+
+    return createdPayout as T;
+  }
+
+  if (method === 'GET' && pathname === '/marketer/payouts') {
+    const account = await requireAuthenticatedAccount();
+    if (!account.roles.includes('marketer')) {
+      throw new ApiClientError(403, 'FORBIDDEN', 'Marketer role required.');
+    }
+
+    const [, queryString = ''] = path.split('?');
+    const params = new URLSearchParams(queryString);
+    const parsedPage = Number.parseInt(params.get('page') ?? '1', 10);
+    const parsedPageSize = Number.parseInt(params.get('pageSize') ?? '20', 10);
+    const statusParam = params.get('status');
+
+    if (
+      statusParam !== null &&
+      statusParam !== '' &&
+      statusParam !== 'pending_review' &&
+      statusParam !== 'confirmed' &&
+      statusParam !== 'rejected'
+    ) {
+      throw new ApiClientError(400, 'VALIDATION_ERROR', 'Invalid payout status filter.');
+    }
+
+    const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const pageSize =
+      Number.isFinite(parsedPageSize) && parsedPageSize > 0
+        ? Math.min(100, parsedPageSize)
+        : 20;
+
+    const walletState = getOrCreateMarketerWalletState(account.id);
+    const sorted = [...walletState.payouts].sort((a, b) => {
+      const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      if (timeDiff !== 0) {
+        return timeDiff;
+      }
+      return b.id.localeCompare(a.id);
+    });
+
+    const filtered = statusParam
+      ? sorted.filter((item) => item.status === statusParam)
+      : sorted;
+
+    const start = (page - 1) * pageSize;
+    const sliced = filtered.slice(start, start + pageSize);
+    const total = filtered.length;
     const hasNext = start + pageSize < total;
 
     return {
@@ -1590,6 +1905,107 @@ export async function handleSandboxRequest<T>(
       maxItems: Number(payload.maxItems),
       availableBalanceSyp: isVerified ? sandboxMerchantAvailableSyp : 0,
     }) as T;
+  }
+
+  if (method === 'POST' && pathname === '/merchant/uploads/image') {
+    const account = await requireAuthenticatedAccount();
+    if (!account.roles.includes('merchant')) {
+      throw new ApiClientError(403, 'FORBIDDEN', 'Merchant role required.');
+    }
+    if (account.merchant?.verificationStatus !== 'verified') {
+      throw new ApiClientError(
+        403,
+        'MERCHANT_NOT_VERIFIED',
+        'A verified merchant profile is required.',
+      );
+    }
+
+    if (typeof FormData === 'undefined' || !(body instanceof FormData)) {
+      throw new ApiClientError(
+        400,
+        'VALIDATION_ERROR',
+        'Submit exactly one valid, static image in the file field.',
+      );
+    }
+
+    const rnFormData = body as {
+      getParts?: () => Record<string, unknown>[];
+      entries?: () => IterableIterator<[string, unknown]>;
+    };
+
+    let fieldName: string | null = null;
+    let fileMimeType: string | null = null;
+    let fileByteSize: number | null = null;
+    let partCount = 0;
+    let hasValidFileShape = false;
+
+    if (typeof rnFormData.getParts === 'function') {
+      const parts = rnFormData.getParts();
+      partCount = parts.length;
+      if (parts.length === 1) {
+        const part = parts[0];
+        fieldName = typeof part.fieldName === 'string' ? part.fieldName : null;
+        const headers = part.headers as Record<string, unknown> | undefined;
+        const headerMime =
+          headers && typeof headers['content-type'] === 'string'
+            ? headers['content-type']
+            : null;
+        fileMimeType =
+          typeof part.type === 'string' ? part.type : headerMime;
+        hasValidFileShape = typeof part.uri === 'string' && part.uri.trim().length > 0;
+      }
+    } else if (typeof rnFormData.entries === 'function') {
+      const entries = Array.from(rnFormData.entries());
+      partCount = entries.length;
+      if (entries.length === 1) {
+        const [entryKey, entryVal] = entries[0];
+        fieldName = entryKey;
+        if (entryVal && typeof entryVal === 'object') {
+          const valObj = entryVal as {
+            uri?: unknown;
+            type?: unknown;
+            size?: unknown;
+          };
+          fileMimeType = typeof valObj.type === 'string' ? valObj.type : null;
+          fileByteSize = typeof valObj.size === 'number' ? valObj.size : null;
+          hasValidFileShape =
+            typeof valObj.uri === 'string' || typeof valObj.size === 'number';
+        }
+      }
+    }
+
+    if (partCount !== 1 || fieldName !== 'file' || !hasValidFileShape) {
+      throw new ApiClientError(
+        400,
+        'VALIDATION_ERROR',
+        'Submit exactly one valid, static image in the file field.',
+      );
+    }
+
+    if (fileByteSize !== null && fileByteSize > 500_000) {
+      throw new ApiClientError(
+        413,
+        'IMAGE_TOO_LARGE',
+        'The image exceeds the supported size or decoded pixel limit.',
+      );
+    }
+
+    const normalizedMime = (fileMimeType ?? '').toLowerCase();
+    if (
+      normalizedMime !== 'image/jpeg' &&
+      normalizedMime !== 'image/png' &&
+      normalizedMime !== 'image/webp'
+    ) {
+      throw new ApiClientError(
+        415,
+        'UNSUPPORTED_IMAGE_FORMAT',
+        'Only static JPEG, PNG and WebP images are supported.',
+      );
+    }
+
+    return {
+      imageUrl: `https://ik.imagekit.io/mardood-dev/mardood/products/dev-${Date.now()}.webp`,
+    } as T;
   }
 
   if (method === 'POST' && pathname === '/merchant/campaigns') {
@@ -2279,6 +2695,8 @@ export async function handleSandboxRequest<T>(
 
 export function incrementSandboxWalletForDevTest(deltaSyp: number): void {
   if (env.useDevSandbox) {
-    sandboxBalanceSyp += deltaSyp;
+    const walletState = getOrCreateMarketerWalletState(DEMO_MARKETER_ACCOUNT.id);
+    walletState.availableBalanceSyp += deltaSyp;
+    walletState.totalEarnedSyp += deltaSyp;
   }
 }

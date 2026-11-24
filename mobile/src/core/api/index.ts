@@ -1,7 +1,12 @@
 export {
   apiRequest,
+  awaitActiveRefresh,
+  beginSignOutGate,
   bumpSessionEpoch,
+  endSignOutGate,
   getSessionEpoch,
+  holdSignOutBlockingRefresh,
+  isSignOutInProgress,
   registerSessionExpiredListener,
   runSingleFlightRefresh,
 } from './client';

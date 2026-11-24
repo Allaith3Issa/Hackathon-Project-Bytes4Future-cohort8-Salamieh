@@ -1,6 +1,7 @@
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import { useIsFocused, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -9,6 +10,7 @@ import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -18,9 +20,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppButton, AppInput, SkeletonBlock } from '@/components/ui';
+import { AppButton, AppInput, SkeletonBlock, StatusBadge } from '@/components/ui';
 import { useAuth } from '@/core/auth';
 import { useLocale } from '@/core/i18n';
 import { useAndroidBack } from '@/core/navigation';
@@ -66,6 +69,7 @@ function CalendarGlyph({ disabled }: { disabled: boolean }) {
 export default function CreateMerchantCampaignScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
+  const reducedMotion = useReducedMotion();
   const { user } = useAuth();
   const { locale, t } = useLocale();
 
@@ -78,8 +82,17 @@ export default function CreateMerchantCampaignScreen() {
     isPreviewLoading,
     hasCompletePreviewInputs,
     isLaunching,
+    selectedImageUri,
+    imageUploadStatus,
+    imageUploadError,
+    imagePermissionDenied,
+    isImageBusy,
     updateField,
     selectEndsAtDate,
+    pickCampaignImageFromGallery,
+    captureCampaignImageWithCamera,
+    retryImageUpload,
+    removeCampaignImage,
     retryPreview,
     submit,
   } = useCreateMerchantCampaign();
@@ -91,7 +104,6 @@ export default function CreateMerchantCampaignScreen() {
   });
 
   const descriptionRef = useRef<ComponentRef<typeof TextInput>>(null);
-  const imageUrlRef = useRef<ComponentRef<typeof TextInput>>(null);
   const originalPriceRef = useRef<ComponentRef<typeof TextInput>>(null);
   const discountPercentRef = useRef<ComponentRef<typeof TextInput>>(null);
   const commissionAmountRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -199,17 +211,27 @@ export default function CreateMerchantCampaignScreen() {
     }
   }, [isLaunching, router]);
 
+  const handleOpenSettings = useCallback(() => {
+    void Linking.openSettings().catch(() => undefined);
+  }, []);
+
   const isInsufficientBalance = preview?.isAffordableByMerchant === false;
   const isSubmitDisabled =
     isLaunching ||
     !isVerified ||
+    isImageBusy ||
+    !draft.imageUrl.trim() ||
     isPreviewLoading ||
     isInsufficientBalance ||
     !preview ||
     Boolean(previewError);
+  const hasImageFieldError = Boolean(
+    fieldErrors.imageUrl && fieldErrors.imageUrl.trim().length > 0,
+  );
   const hasEndsAtError = Boolean(
     fieldErrors.endsAt && fieldErrors.endsAt.trim().length > 0,
   );
+  const canPickImage = isVerified && !isLaunching;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
@@ -290,22 +312,192 @@ export default function CreateMerchantCampaignScreen() {
               inputStyle={styles.multilineInput}
             />
 
-            <AppInput
-              ref={imageUrlRef}
-              testID="campaign-image-url-input"
-              label={t.merchant.createCampaign.imageUrlLabel}
-              placeholder={t.merchant.createCampaign.imageUrlPlaceholder}
-              value={draft.imageUrl}
-              onChangeText={(value) => updateField('imageUrl', value)}
-              error={fieldErrors.imageUrl}
-              editable={!isLaunching}
-              forceLtr
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              returnKeyType="next"
-              onSubmitEditing={() => originalPriceRef.current?.focus()}
-            />
+            <View style={styles.imageSection}>
+              <Text style={[Typography.label, directionalText]}>
+                {t.merchant.createCampaign.productImageLabel}
+              </Text>
+              <Text style={[Typography.caption, directionalText, styles.mutedText]}>
+                {t.merchant.createCampaign.productImageHint}
+              </Text>
+
+              {!selectedImageUri ? (
+                <View
+                  testID="campaign-image-empty-card"
+                  style={[
+                    styles.imagePickerCard,
+                    hasImageFieldError ? styles.imagePickerCardError : null,
+                  ]}
+                >
+                  <View style={styles.imageActionsRow}>
+                    <View style={styles.imageActionSlot}>
+                      <AppButton
+                        testID="campaign-image-gallery-button"
+                        variant="secondary"
+                        label={t.merchant.createCampaign.pickFromGalleryAction}
+                        disabled={!canPickImage}
+                        onPress={() => void pickCampaignImageFromGallery()}
+                      />
+                    </View>
+                    <View style={styles.imageActionSlot}>
+                      <AppButton
+                        testID="campaign-image-camera-button"
+                        variant="secondary"
+                        label={t.merchant.createCampaign.takePhotoAction}
+                        disabled={!canPickImage}
+                        onPress={() => void captureCampaignImageWithCamera()}
+                      />
+                    </View>
+                  </View>
+
+                  {!isVerified ? (
+                    <Text
+                      testID="campaign-image-unverified-hint"
+                      style={[Typography.caption, directionalText, styles.dangerText]}
+                    >
+                      {t.merchant.createCampaign.verifiedMerchantRequiredForImage}
+                    </Text>
+                  ) : null}
+
+                  {imageUploadStatus === 'error' && imageUploadError ? (
+                    <View
+                      testID="campaign-image-error-banner"
+                      style={[styles.dangerBanner, styles.imageErrorBanner]}
+                      accessibilityLiveRegion="polite"
+                    >
+                      <Text
+                        style={[Typography.caption, directionalText, styles.dangerText]}
+                      >
+                        {imageUploadError}
+                      </Text>
+                      {imagePermissionDenied !== null ? (
+                        <View style={styles.imageErrorActions}>
+                          <AppButton
+                            testID="campaign-image-open-settings-button"
+                            variant="secondary"
+                            fullWidth={false}
+                            label={t.merchant.createCampaign.openSettingsAction}
+                            onPress={handleOpenSettings}
+                          />
+                        </View>
+                      ) : null}
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                <View
+                  testID="campaign-image-preview-card"
+                  style={[
+                    styles.imagePreviewCard,
+                    hasImageFieldError ? styles.imagePickerCardError : null,
+                  ]}
+                >
+                  <Image
+                    testID="campaign-image-preview"
+                    source={{ uri: selectedImageUri }}
+                    contentFit="cover"
+                    transition={reducedMotion ? 0 : 180}
+                    accessibilityLabel={t.merchant.createCampaign.productImageLabel}
+                    style={styles.imagePreview}
+                  />
+
+                  {isImageBusy ? (
+                    <View
+                      testID="campaign-image-status-loading"
+                      style={styles.imageStatusRow}
+                      accessibilityLiveRegion="polite"
+                    >
+                      <ActivityIndicator size="small" color={Colors.action} />
+                      <Text
+                        style={[Typography.label, directionalText, styles.mutedText]}
+                      >
+                        {imageUploadStatus === 'compressing'
+                          ? t.merchant.createCampaign.compressingImageStatus
+                          : t.merchant.createCampaign.uploadingImageStatus}
+                      </Text>
+                    </View>
+                  ) : imageUploadStatus === 'uploaded' ? (
+                    <View testID="campaign-image-status-uploaded">
+                      <StatusBadge
+                        tone="success"
+                        showDot
+                        label={t.merchant.createCampaign.imageUploadedStatus}
+                      />
+                    </View>
+                  ) : imageUploadStatus === 'error' && imageUploadError ? (
+                    <View
+                      testID="campaign-image-error-banner"
+                      style={[styles.dangerBanner, styles.imageErrorBanner]}
+                      accessibilityLiveRegion="polite"
+                    >
+                      <Text
+                        style={[Typography.caption, directionalText, styles.dangerText]}
+                      >
+                        {imageUploadError}
+                      </Text>
+                      <View style={styles.imageErrorActions}>
+                        <AppButton
+                          testID="campaign-image-retry-button"
+                          variant="secondary"
+                          fullWidth={false}
+                          label={t.merchant.createCampaign.retryImageUploadAction}
+                          disabled={!canPickImage}
+                          onPress={() => void retryImageUpload()}
+                        />
+                        {imagePermissionDenied !== null ? (
+                          <AppButton
+                            testID="campaign-image-open-settings-button"
+                            variant="secondary"
+                            fullWidth={false}
+                            label={t.merchant.createCampaign.openSettingsAction}
+                            onPress={handleOpenSettings}
+                          />
+                        ) : null}
+                      </View>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.imageActionsRow}>
+                    <View style={styles.imageActionSlot}>
+                      <AppButton
+                        testID="campaign-image-gallery-button"
+                        variant="secondary"
+                        label={t.merchant.createCampaign.pickFromGalleryAction}
+                        disabled={!canPickImage}
+                        onPress={() => void pickCampaignImageFromGallery()}
+                      />
+                    </View>
+                    <View style={styles.imageActionSlot}>
+                      <AppButton
+                        testID="campaign-image-camera-button"
+                        variant="secondary"
+                        label={t.merchant.createCampaign.takePhotoAction}
+                        disabled={!canPickImage}
+                        onPress={() => void captureCampaignImageWithCamera()}
+                      />
+                    </View>
+                  </View>
+
+                  <AppButton
+                    testID="campaign-image-remove-button"
+                    variant="ghost"
+                    fullWidth={false}
+                    label={t.merchant.createCampaign.removeImageAction}
+                    disabled={isLaunching}
+                    onPress={removeCampaignImage}
+                  />
+                </View>
+              )}
+
+              {hasImageFieldError ? (
+                <Text
+                  testID="campaign-image-field-error"
+                  accessibilityLiveRegion="polite"
+                  style={[Typography.caption, directionalText, styles.dangerText]}
+                >
+                  {fieldErrors.imageUrl}
+                </Text>
+              ) : null}
+            </View>
 
             <AppInput
               ref={originalPriceRef}
@@ -752,6 +944,57 @@ const styles = StyleSheet.create({
   multilineInput: {
     minHeight: 104,
     paddingTop: 12,
+  },
+  imageSection: {
+    gap: Spacing.compact,
+  },
+  imagePickerCard: {
+    backgroundColor: Colors.mauveTint,
+    borderRadius: Radii.panel,
+    borderWidth: BorderWidth.hairline,
+    borderColor: Colors.rule,
+    padding: Spacing.gutter,
+    gap: Spacing.compact + 2,
+  },
+  imagePreviewCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.panel,
+    borderWidth: BorderWidth.hairline,
+    borderColor: Colors.rule,
+    padding: Spacing.compact + 4,
+    gap: Spacing.compact + 2,
+  },
+  imagePickerCardError: {
+    borderColor: Colors.danger,
+    borderWidth: BorderWidth.focus,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 196,
+    borderRadius: Radii.panel,
+    backgroundColor: Colors.mauveTint,
+  },
+  imageStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.compact,
+  },
+  imageErrorBanner: {
+    gap: Spacing.compact,
+  },
+  imageErrorActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.compact,
+  },
+  imageActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.compact,
+  },
+  imageActionSlot: {
+    flexGrow: 1,
+    flexBasis: 132,
   },
   endsAtSection: {
     gap: Spacing.compact,

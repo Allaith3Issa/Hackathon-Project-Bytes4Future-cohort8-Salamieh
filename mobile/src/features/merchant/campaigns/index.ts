@@ -5,7 +5,24 @@ export {
   fetchMerchantCampaigns,
   launchMerchantCampaign,
   previewMerchantCampaign,
+  uploadMerchantCampaignImage,
 } from './api';
+export type {
+  CampaignImageUploadAsset,
+  UploadCampaignImageResponse,
+} from './api';
+export {
+  CampaignImageCompressionError,
+  compressCampaignImageForUpload,
+  isCampaignImageCompressionError,
+  MAX_BACKEND_IMAGE_BYTES,
+  readLocalFileByteSize,
+  SAFE_CLIENT_IMAGE_BYTES,
+} from './imageUpload';
+export type {
+  CampaignImageCompressionFailureReason,
+  CompressedCampaignImage,
+} from './imageUpload';
 export {
   getMerchantCampaignDetailCacheKey,
   getMerchantCampaignsCacheKey,
@@ -15,7 +32,11 @@ export {
   useMerchantCampaignDetail,
   useMerchantCampaigns,
 } from './hooks';
-export type { MerchantCampaignsCacheSnapshot } from './hooks';
+export type {
+  CampaignImagePermissionType,
+  CampaignImageUploadStatus,
+  MerchantCampaignsCacheSnapshot,
+} from './hooks';
 export type {
   Campaign,
   CampaignPreview,

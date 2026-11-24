@@ -295,11 +295,11 @@ export function validateCampaignDraft(
   }
 
   if (!trimmedImageUrl) {
-    fieldErrors.imageUrl = t.merchant.createCampaign.imageUrlRequired;
+    fieldErrors.imageUrl = t.merchant.createCampaign.imageRequiredError;
   } else if (trimmedImageUrl.length > MAX_CAMPAIGN_IMAGE_URL_LENGTH) {
-    fieldErrors.imageUrl = t.merchant.createCampaign.imageUrlTooLong;
+    fieldErrors.imageUrl = t.errors.IMAGE_UPLOAD_FAILED;
   } else if (!isSafeHttpUrl(trimmedImageUrl)) {
-    fieldErrors.imageUrl = t.merchant.createCampaign.imageUrlInvalid;
+    fieldErrors.imageUrl = t.errors.IMAGE_UPLOAD_FAILED;
   }
 
   const originalPriceSyp = parseNewSypToMinorUnits(draft.originalPrice, {
