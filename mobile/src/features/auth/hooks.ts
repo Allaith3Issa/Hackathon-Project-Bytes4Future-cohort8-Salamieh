@@ -1,5 +1,5 @@
 import * as Haptics from 'expo-haptics';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { extractFieldErrors, mapApiErrorToMessage } from '@/core/api';
 import { useAuth } from '@/core/auth';
@@ -400,6 +400,14 @@ export function useSignOut() {
   const { signOut } = useAuth();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const inFlightRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     if (inFlightRef.current) {
@@ -411,7 +419,9 @@ export function useSignOut() {
       return await signOut();
     } finally {
       inFlightRef.current = false;
-      setIsSigningOut(false);
+      if (isMountedRef.current) {
+        setIsSigningOut(false);
+      }
     }
   }, [signOut]);
 

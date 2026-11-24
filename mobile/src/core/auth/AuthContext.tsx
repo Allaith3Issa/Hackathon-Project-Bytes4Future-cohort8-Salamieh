@@ -9,11 +9,15 @@ import {
 } from 'react';
 import type { ReactNode } from 'react';
 
-import { logoutSession } from '../../features/auth/api';
+import { logoutSession, refreshAuthSession } from '../../features/auth/api';
 import {
   apiRequest,
+  awaitActiveRefresh,
+  beginSignOutGate,
   bumpSessionEpoch,
+  endSignOutGate,
   getSessionEpoch,
+  holdSignOutBlockingRefresh,
   isApiClientError,
   registerSessionExpiredListener,
   runSingleFlightRefresh,
@@ -45,6 +49,66 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+const LOGOUT_REQUEST_TIMEOUT_MS = 4_000;
+const BASE64URL_ALPHABET =
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+function decodeBase64UrlToString(segment: string): string | null {
+  const normalized = segment.replace(/-/g, '+').replace(/_/g, '/');
+  if (!normalized || normalized.length % 4 === 1) {
+    return null;
+  }
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+  let output = '';
+
+  for (let i = 0; i < padded.length; i += 4) {
+    const c1 = BASE64URL_ALPHABET.indexOf(padded[i]);
+    const c2 = BASE64URL_ALPHABET.indexOf(padded[i + 1]);
+    const c3 = padded[i + 2] === '=' ? -1 : BASE64URL_ALPHABET.indexOf(padded[i + 2]);
+    const c4 = padded[i + 3] === '=' ? -1 : BASE64URL_ALPHABET.indexOf(padded[i + 3]);
+
+    if (c1 === -1 || c2 === -1 || (padded[i + 2] !== '=' && c3 === -1) || (padded[i + 3] !== '=' && c4 === -1)) {
+      return null;
+    }
+
+    const b1 = (c1 << 2) | (c2 >> 4);
+    output += String.fromCharCode(b1);
+
+    if (c3 !== -1) {
+      const b2 = ((c2 & 0x0f) << 4) | (c3 >> 2);
+      output += String.fromCharCode(b2);
+      if (c4 !== -1) {
+        const b3 = ((c3 & 0x03) << 6) | c4;
+        output += String.fromCharCode(b3);
+      }
+    }
+  }
+
+  return output;
+}
+
+function isAccessTokenExpired(token: string, skewMs = 5_000): boolean {
+  const parts = token.split('.');
+  if (parts.length !== 3) {
+    return false;
+  }
+
+  const decodedPayload = decodeBase64UrlToString(parts[1]);
+  if (!decodedPayload) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(decodedPayload) as { exp?: unknown };
+    if (typeof parsed.exp !== 'number' || !Number.isFinite(parsed.exp)) {
+      return false;
+    }
+    return Date.now() >= parsed.exp * 1000 - skewMs;
+  } catch {
+    return false;
+  }
+}
 
 function isDefinitiveAuthRejection(error: unknown): boolean {
   if (!isApiClientError(error)) {
@@ -104,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pendingReferralCodeRef = useRef<string | null>(null);
   pendingReferralCodeRef.current = pendingReferralCode;
   const switchingRoleRef = useRef(false);
+  const signingOutRef = useRef(false);
 
   const wipeLocalSession = useCallback(async (markExpired: boolean) => {
     await tokenStorage.clearTokens();
@@ -304,27 +369,113 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async (): Promise<{ serverLogoutFailed: boolean }> => {
-    bumpSessionEpoch();
-    const [accessToken, refreshToken] = await Promise.all([
-      tokenStorage.getAccessToken(),
-      tokenStorage.getRefreshToken(),
-    ]);
-
-    await wipeLocalSession(false);
-    setSessionExpiredNotice(false);
-
-    if (!accessToken && !refreshToken) {
+    if (signingOutRef.current) {
       return { serverLogoutFailed: false };
     }
-
+    signingOutRef.current = true;
+    const preSignOutEpoch = holdSignOutBlockingRefresh();
+    let logoutEpoch: number | null = null;
     let serverLogoutFailed = false;
-    try {
-      await logoutSession(refreshToken, accessToken);
-    } catch {
-      serverLogoutFailed = true;
-    }
 
-    return { serverLogoutFailed };
+    try {
+      const preRefreshed = await awaitActiveRefresh(LOGOUT_REQUEST_TIMEOUT_MS);
+      if (getSessionEpoch() !== preSignOutEpoch) {
+        return { serverLogoutFailed: false };
+      }
+
+      logoutEpoch = beginSignOutGate();
+
+      const revokeWithRefresh = async (currentRefreshToken: string): Promise<void> => {
+        const refreshed = await refreshAuthSession(currentRefreshToken, {
+          timeoutMs: LOGOUT_REQUEST_TIMEOUT_MS,
+        });
+        await logoutSession(refreshed.refreshToken, refreshed.accessToken, {
+          timeoutMs: LOGOUT_REQUEST_TIMEOUT_MS,
+        });
+      };
+
+      const revokeWithAccessOrFallback = async (
+        currentAccessToken: string,
+        currentRefreshToken: string | null,
+      ): Promise<void> => {
+        try {
+          await logoutSession(currentRefreshToken, currentAccessToken, {
+            timeoutMs: LOGOUT_REQUEST_TIMEOUT_MS,
+          });
+        } catch (error: unknown) {
+          const shouldRefreshOnAuthError =
+            isApiClientError(error) &&
+            error.statusCode === 401 &&
+            (error.code === 'AUTH_REQUIRED' || error.code === 'SESSION_EXPIRED');
+
+          if (shouldRefreshOnAuthError && currentRefreshToken) {
+            await revokeWithRefresh(currentRefreshToken);
+          } else {
+            throw error;
+          }
+        }
+      };
+
+      if (preRefreshed) {
+        try {
+          await revokeWithAccessOrFallback(
+            preRefreshed.accessToken,
+            preRefreshed.refreshToken,
+          );
+        } catch (error: unknown) {
+          if (
+            isApiClientError(error) &&
+            (error.code === 'REFRESH_TOKEN_INVALID' || error.code === 'SESSION_EXPIRED')
+          ) {
+            serverLogoutFailed = false;
+          } else {
+            serverLogoutFailed = true;
+          }
+        }
+        return { serverLogoutFailed };
+      }
+
+      const [accessToken, refreshToken] = await Promise.all([
+        tokenStorage.getAccessToken(),
+        tokenStorage.getRefreshToken(),
+      ]);
+
+      if (!accessToken && !refreshToken) {
+        return { serverLogoutFailed: false };
+      }
+
+      try {
+        if (accessToken && !isAccessTokenExpired(accessToken)) {
+          await revokeWithAccessOrFallback(accessToken, refreshToken);
+        } else if (refreshToken) {
+          await revokeWithRefresh(refreshToken);
+        } else {
+          serverLogoutFailed = true;
+        }
+      } catch (error: unknown) {
+        if (
+          isApiClientError(error) &&
+          (error.code === 'REFRESH_TOKEN_INVALID' || error.code === 'SESSION_EXPIRED')
+        ) {
+          serverLogoutFailed = false;
+        } else {
+          serverLogoutFailed = true;
+        }
+      }
+
+      return { serverLogoutFailed };
+    } finally {
+      if (logoutEpoch !== null) {
+        endSignOutGate(logoutEpoch);
+        if (getSessionEpoch() === logoutEpoch) {
+          await wipeLocalSession(false);
+          setSessionExpiredNotice(false);
+        }
+      } else {
+        endSignOutGate(preSignOutEpoch);
+      }
+      signingOutRef.current = false;
+    }
   }, [wipeLocalSession]);
 
   const clearSessionExpiredNotice = useCallback(() => {

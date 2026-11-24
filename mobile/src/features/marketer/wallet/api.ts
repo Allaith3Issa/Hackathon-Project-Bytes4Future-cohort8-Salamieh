@@ -1,11 +1,21 @@
 import { apiRequest } from '@/core/api';
 import type { PaginatedResponse } from '@/core/api';
 import type {
+  CreateMarketerPayoutInput,
+  FetchMarketerPayoutsParams,
   MarketerMerchantEarnings,
+  MarketerPayout,
   MarketerStats,
   MarketerWallet,
   MarketerWalletTransaction,
+  PayoutStatus,
 } from './types';
+
+const VALID_PAYOUT_STATUSES = new Set<PayoutStatus>([
+  'pending_review',
+  'confirmed',
+  'rejected',
+]);
 
 export const DEFAULT_MARKETER_WALLET_PAGE_SIZE = 20;
 
@@ -77,4 +87,53 @@ export async function fetchMarketerWalletTransactions(
       auth: true,
     },
   );
+}
+
+/**
+ * GET /api/v1/marketer/payouts
+ * Retrieves paginated marketer simulated payout requests ordered newest first.
+ */
+export async function fetchMarketerPayouts(
+  params: FetchMarketerPayoutsParams = {},
+): Promise<PaginatedResponse<MarketerPayout>> {
+  const safePage = Math.max(1, Math.trunc(params.page ?? 1));
+  const safePageSize = Math.min(
+    100,
+    Math.max(1, Math.trunc(params.pageSize ?? DEFAULT_MARKETER_WALLET_PAGE_SIZE)),
+  );
+  const query = new URLSearchParams({
+    page: String(safePage),
+    pageSize: String(safePageSize),
+  });
+
+  if (params.status && VALID_PAYOUT_STATUSES.has(params.status)) {
+    query.set('status', params.status);
+  }
+
+  return apiRequest<PaginatedResponse<MarketerPayout>>(
+    `/marketer/payouts?${query.toString()}`,
+    {
+      method: 'GET',
+      auth: true,
+      signal: params.signal,
+    },
+  );
+}
+
+/**
+ * POST /api/v1/marketer/payouts
+ * Submits a simulated full-balance marketer payout request with Idempotency-Key protection.
+ */
+export async function requestMarketerPayout(
+  expectedAmountSyp: number,
+  idempotencyKey: string,
+): Promise<MarketerPayout> {
+  const body: CreateMarketerPayoutInput = { expectedAmountSyp };
+
+  return apiRequest<MarketerPayout>('/marketer/payouts', {
+    method: 'POST',
+    auth: true,
+    body,
+    idempotencyKey,
+  });
 }

@@ -60,9 +60,9 @@
 ## القسم (B): النواة — API Client، المصادقة، الجلسة، الكاش، والـ Idempotency
 
 - [x] **B1 — حل سباق `runSingleFlightRefresh()` مع `signOut()`/`establishSession()` ومسار `/auth/logout`** *(حرجة - أمان وتزامن)*
-  - **المسار:** `src/core/api/client.ts:108-160, 188-203`، `src/core/auth/AuthContext.tsx:139-199`، `src/features/auth/api.ts:64`
-  - **المشكلة:** غياب `sessionEpoch` يجعل تجديد توكن بطيء لحساب سابق يكتب فوق توكنات حساب جديد أو يمسح جلسته؛ و`signOut()` تنتظر `/auth/logout` حتى 15 ثانية قبل مسح الواجهة والكاش، وإذا كان `accessToken` منتهياً ترسل `/auth/logout` بالـ `refreshToken` القديم بعد دورانه فتفشل بـ `401`.
-  - **الحل المعتمد:** إضافة `sessionEpoch` يزداد عند `establishSession` و`signOut` و`clearAuthAndCache` لإهمال أي نتيجة تجديد قديمة؛ إضافة `skipRefreshOn401?: boolean` في `ApiRequestOptions`؛ واستدعاء `logoutSession(refreshToken)` مع `skipRefreshOn401: true` (ما يحيي الدالة الميتة في `auth/api.ts:64`) مع مسح الحالة والكاش المحلي فوراً أثناء `signOut`.
+  - **المسار:** `src/core/api/{client,index}.ts`, `src/core/auth/AuthContext.tsx:48-107, 367-490`, `src/features/auth/{api,hooks,index}.ts`, `src/core/dev/sandboxAdapter.ts:915-920, 1051-1075`
+  - **المشكلة:** غياب `sessionEpoch` يجعل تجديد توكن بطيء لحساب سابق يكتب فوق توكنات حساب جديد أو يمسح جلسته؛ كما أن مسح التوكنات المحلية قبل `/auth/logout` مع `skipRefreshOn401: true` يمنع إلغاء الجلسة بالسيرفر عند انتهاء `accessToken`، وأثناء انتظار `signOut()` قد يتنافس طلب خلفية يأخذ `401` عبر `runSingleFlightRefresh()` على نفس `refreshToken`.
+  - **الحل المعتمد:** إضافة `sessionEpoch` + `signingOutRef` + حاجز الخروج المرتبط بالجيل (`holdSignOutBlockingRefresh`, `beginSignOutGate`, `endSignOutGate`, `isSignOutInProgress`, `awaitActiveRefresh`) لمنع أي `runSingleFlightRefresh()` جديد أو إطلاق `sessionExpiredListener` أثناء الخروج واستثمار أي تجديد جارٍ مسبقاً مع تنظيف تلقائي للحاجز عند أي `establishSession()` جديد؛ إضافة `refreshAuthSession(refreshToken, { timeoutMs })` المعزولة؛ وفحص انتهاء `accessToken` محلياً (`isAccessTokenExpired`) أو الاستجابة لـ `401 AUTH_REQUIRED`/`SESSION_EXPIRED` لإلغاء الجلسة بالتوكنين المدوّرين بمهلة `4_000ms` قبل مسح `SecureStore` في `finally` (مع حماية `isMountedRef` في `useSignOut` وتطابق `Dev Sandbox`).
 
 - [x] **B2 — منع مسح `SecureStore` وإخراج المستخدم عند انقطاع الشبكة أو `5xx`** *(عالية - موثوقية الجلسة)*
   - **المسار:** `src/core/auth/AuthContext.tsx:94-129`، `src/core/api/client.ts:151-154`

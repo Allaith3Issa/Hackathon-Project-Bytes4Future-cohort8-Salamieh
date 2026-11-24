@@ -29,8 +29,7 @@ export type MarketerWalletTransactionKind =
   | 'marketer_commission_credit'
   | 'payout_hold'
   | 'payout_release_refund'
-  | 'payout_completed'
-  | 'payout_transfer_reversal';
+  | 'payout_completed';
 
 export interface MarketerWalletTransaction {
   id: string;
@@ -40,4 +39,26 @@ export interface MarketerWalletTransaction {
   campaignName: string | null;
   shopName: string | null;
   createdAt: string;
+}
+
+export type PayoutStatus = 'pending_review' | 'confirmed' | 'rejected';
+
+export interface MarketerPayout {
+  id: string;
+  amountSyp: number;
+  status: PayoutStatus;
+  createdAt: string;
+  decidedAt: string | null;
+  rejectionReason: string | null;
+}
+
+export interface CreateMarketerPayoutInput {
+  expectedAmountSyp: number;
+}
+
+export interface FetchMarketerPayoutsParams {
+  page?: number;
+  pageSize?: number;
+  status?: PayoutStatus;
+  signal?: AbortSignal;
 }

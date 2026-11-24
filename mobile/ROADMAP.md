@@ -109,8 +109,9 @@
   - Approval-required participant management (`GET/PATCH /merchant/campaigns/:id/participants`).
   - Active `directReferralUrl` generation.
 - [ ] **4.2 — Marketer Extensions**:
-  - Payout requests, Sham Cash receipt viewer, confirm & dispute flows (`/marketer/payouts*`).
-  - Public leaderboard (`GET /public/leaderboard`).
+  - [x] **Simulated Payouts (`POST /marketer/payouts`, `GET /marketer/payouts`)**: Completed simulated payout request confirmation modal (`expectedAmountSyp` balance-change guard & `409` handling), `totalConfirmedPaidOutSyp` summary card, and paginated payouts history with status filters & rejection reason display in `marketer/(tabs)/wallet.tsx`.
+  - [ ] Real transfers & receipts (**Backlog — waiting on backend**): Sham Cash receipt viewer, confirm, and dispute flows.
+  - [ ] Public leaderboard (`GET /public/leaderboard`) (**Backlog — waiting on backend**).
 - [ ] **4.3 — Customer Extensions**:
   - Cashback voucher issuance, listing, and cancellation (`POST /customer/cashback-vouchers`, `GET /customer/cashback-vouchers`, `POST /customer/cashback-vouchers/:voucherId/cancel`).
   - Server-side active Offer QR pass list or public offer catalog if added to `api/src/`.

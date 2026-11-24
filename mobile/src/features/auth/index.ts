@@ -2,6 +2,7 @@ export {
   fetchCurrentAccount,
   loginWithPassword,
   logoutSession,
+  refreshAuthSession,
   registerAccount,
 } from './api';
 export { useAccountRefresh, useLoginForm, useRegisterForm, useSignOut } from './hooks';

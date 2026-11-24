@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect, useIsFocused, useRouter } from 'expo-router';
 import type { Href } from 'expo-router';
 import {
@@ -28,7 +29,12 @@ import {
   fetchMerchantCampaigns,
   launchMerchantCampaign,
   previewMerchantCampaign,
+  uploadMerchantCampaignImage,
 } from './api';
+import {
+  compressCampaignImageForUpload,
+  isCampaignImageCompressionError,
+} from './imageUpload';
 import type {
   CampaignPreview,
   MerchantCampaign,
@@ -607,6 +613,19 @@ export function useMerchantCampaignDetail(campaignId: string) {
 
 const PREVIEW_DEBOUNCE_MS = 400;
 
+export type CampaignImageUploadStatus =
+  | 'idle'
+  | 'compressing'
+  | 'uploading'
+  | 'uploaded'
+  | 'error';
+
+export type CampaignImagePermissionType = 'gallery' | 'camera';
+
+function isImageUploadAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
+}
+
 export function useCreateMerchantCampaign() {
   const { user, activeRole } = useAuth();
   const { locale, t } = useLocale();
@@ -626,6 +645,12 @@ export function useCreateMerchantCampaign() {
   const [fieldErrors, setFieldErrors] = useState<CampaignDraftFieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [imageUploadStatus, setImageUploadStatus] =
+    useState<CampaignImageUploadStatus>('idle');
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [imagePermissionDenied, setImagePermissionDenied] =
+    useState<CampaignImagePermissionType | null>(null);
   const [previewState, setPreviewState] = useState<{
     fingerprint: string;
     attemptSeq: number;
@@ -636,12 +661,29 @@ export function useCreateMerchantCampaign() {
 
   const isLaunchingRef = useRef(false);
   const idempotencySlotRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
+  const uploadSeqRef = useRef(0);
+  const lastLocalAssetUriRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+
+  const isImageBusy =
+    imageUploadStatus === 'compressing' || imageUploadStatus === 'uploading';
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      uploadAbortRef.current?.abort();
+      uploadAbortRef.current = null;
+    };
+  }, []);
 
   const updateField = useCallback(
     <K extends keyof CampaignDraftFormInput>(
       field: K,
       value: CampaignDraftFormInput[K],
     ) => {
+      idempotencySlotRef.current = null;
       setDraft((prev) => ({ ...prev, [field]: value }));
       setFieldErrors((prev) =>
         prev[field] ? { ...prev, [field]: undefined } : prev,
@@ -660,6 +702,283 @@ export function useCreateMerchantCampaign() {
     },
     [],
   );
+
+  const runCompressAndUpload = useCallback(
+    async (localUri: string): Promise<boolean> => {
+      if (isLaunchingRef.current) {
+        return false;
+      }
+
+      uploadAbortRef.current?.abort();
+      const controller = new AbortController();
+      uploadAbortRef.current = controller;
+      const seq = ++uploadSeqRef.current;
+
+      lastLocalAssetUriRef.current = localUri;
+      idempotencySlotRef.current = null;
+
+      setDraft((prev) => (prev.imageUrl ? { ...prev, imageUrl: '' } : prev));
+      setFieldErrors((prev) =>
+        prev.imageUrl ? { ...prev, imageUrl: undefined } : prev,
+      );
+      setSubmitError(null);
+      setImagePermissionDenied(null);
+      setImageUploadError(null);
+      setImageUploadStatus('compressing');
+
+      try {
+        const compressed = await compressCampaignImageForUpload(
+          localUri,
+          controller.signal,
+        );
+        if (
+          !isMountedRef.current ||
+          controller.signal.aborted ||
+          seq !== uploadSeqRef.current
+        ) {
+          return false;
+        }
+
+        setImageUploadStatus('uploading');
+        const uploaded = await uploadMerchantCampaignImage(
+          compressed,
+          controller.signal,
+        );
+        if (
+          !isMountedRef.current ||
+          controller.signal.aborted ||
+          seq !== uploadSeqRef.current
+        ) {
+          return false;
+        }
+
+        const nextImageUrl = uploaded?.imageUrl?.trim() ?? '';
+        if (!nextImageUrl) {
+          throw new Error('Missing uploaded image URL.');
+        }
+
+        idempotencySlotRef.current = null;
+        setDraft((prev) => ({ ...prev, imageUrl: nextImageUrl }));
+        setFieldErrors((prev) =>
+          prev.imageUrl ? { ...prev, imageUrl: undefined } : prev,
+        );
+        setImageUploadError(null);
+        setImageUploadStatus('uploaded');
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success,
+        ).catch(() => undefined);
+        return true;
+      } catch (err: unknown) {
+        if (
+          isImageUploadAbortError(err) ||
+          controller.signal.aborted ||
+          seq !== uploadSeqRef.current ||
+          !isMountedRef.current
+        ) {
+          return false;
+        }
+
+        const localizedError = isCampaignImageCompressionError(err)
+          ? err.reason === 'SIZE_LIMIT_EXCEEDED'
+            ? t.merchant.createCampaign.imageCompressionFailedError
+            : t.merchant.createCampaign.imageReadFailedError
+          : mapApiErrorToMessage(err, locale);
+        setImageUploadStatus('error');
+        setImageUploadError(localizedError);
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Error,
+        ).catch(() => undefined);
+        return false;
+      } finally {
+        if (uploadAbortRef.current === controller) {
+          uploadAbortRef.current = null;
+        }
+      }
+    },
+    [
+      locale,
+      t.merchant.createCampaign.imageCompressionFailedError,
+      t.merchant.createCampaign.imageReadFailedError,
+    ],
+  );
+
+  const pickCampaignImageFromGallery = useCallback(async () => {
+    if (isLaunchingRef.current) {
+      return;
+    }
+
+    if (
+      !user ||
+      activeRole !== 'merchant' ||
+      user.merchant?.verificationStatus !== 'verified'
+    ) {
+      setImagePermissionDenied(null);
+      setImageUploadStatus('error');
+      setImageUploadError(
+        t.merchant.createCampaign.verifiedMerchantRequiredForImage,
+      );
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!isMountedRef.current || isLaunchingRef.current) {
+        return;
+      }
+
+      if (!permission.granted) {
+        setImagePermissionDenied('gallery');
+        setImageUploadStatus('error');
+        setImageUploadError(t.merchant.createCampaign.galleryPermissionDenied);
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Error,
+        ).catch(() => undefined);
+        return;
+      }
+
+      setImagePermissionDenied(null);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+        allowsMultipleSelection: false,
+      });
+
+      if (!isMountedRef.current || isLaunchingRef.current || result.canceled) {
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        return;
+      }
+
+      setSelectedImageUri(asset.uri);
+      await runCompressAndUpload(asset.uri);
+    } catch (err: unknown) {
+      if (!isMountedRef.current) {
+        return;
+      }
+      setImageUploadStatus('error');
+      setImageUploadError(mapApiErrorToMessage(err, locale));
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error,
+      ).catch(() => undefined);
+    }
+  }, [
+    activeRole,
+    locale,
+    runCompressAndUpload,
+    t.merchant.createCampaign.galleryPermissionDenied,
+    t.merchant.createCampaign.verifiedMerchantRequiredForImage,
+    user,
+  ]);
+
+  const captureCampaignImageWithCamera = useCallback(async () => {
+    if (isLaunchingRef.current) {
+      return;
+    }
+
+    if (
+      !user ||
+      activeRole !== 'merchant' ||
+      user.merchant?.verificationStatus !== 'verified'
+    ) {
+      setImagePermissionDenied(null);
+      setImageUploadStatus('error');
+      setImageUploadError(
+        t.merchant.createCampaign.verifiedMerchantRequiredForImage,
+      );
+      return;
+    }
+
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!isMountedRef.current || isLaunchingRef.current) {
+        return;
+      }
+
+      if (!permission.granted) {
+        setImagePermissionDenied('camera');
+        setImageUploadStatus('error');
+        setImageUploadError(t.merchant.createCampaign.cameraPermissionDenied);
+        void Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Error,
+        ).catch(() => undefined);
+        return;
+      }
+
+      setImagePermissionDenied(null);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false,
+        quality: 1,
+        cameraType: ImagePicker.CameraType.back,
+      });
+
+      if (!isMountedRef.current || isLaunchingRef.current || result.canceled) {
+        return;
+      }
+
+      const asset = result.assets?.[0];
+      if (!asset?.uri) {
+        return;
+      }
+
+      setSelectedImageUri(asset.uri);
+      await runCompressAndUpload(asset.uri);
+    } catch {
+      if (!isMountedRef.current) {
+        return;
+      }
+      setImageUploadStatus('error');
+      setImageUploadError(t.merchant.createCampaign.cameraUnavailableError);
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error,
+      ).catch(() => undefined);
+    }
+  }, [
+    activeRole,
+    runCompressAndUpload,
+    t.merchant.createCampaign.cameraPermissionDenied,
+    t.merchant.createCampaign.cameraUnavailableError,
+    t.merchant.createCampaign.verifiedMerchantRequiredForImage,
+    user,
+  ]);
+
+  const retryImageUpload = useCallback(async () => {
+    if (isLaunchingRef.current) {
+      return;
+    }
+    const localUri = lastLocalAssetUriRef.current;
+    if (!localUri) {
+      return;
+    }
+    setSelectedImageUri(localUri);
+    await runCompressAndUpload(localUri);
+  }, [runCompressAndUpload]);
+
+  const removeCampaignImage = useCallback(() => {
+    if (isLaunchingRef.current) {
+      return;
+    }
+
+    uploadSeqRef.current += 1;
+    uploadAbortRef.current?.abort();
+    uploadAbortRef.current = null;
+    lastLocalAssetUriRef.current = null;
+    idempotencySlotRef.current = null;
+
+    setSelectedImageUri(null);
+    setImageUploadStatus('idle');
+    setImageUploadError(null);
+    setImagePermissionDenied(null);
+    setSubmitError(null);
+    setDraft((prev) => ({ ...prev, imageUrl: '' }));
+    setFieldErrors((prev) =>
+      prev.imageUrl ? { ...prev, imageUrl: undefined } : prev,
+    );
+  }, []);
 
   const selectEndsAtDate = useCallback(
     (date: Date) => {
@@ -757,7 +1076,12 @@ export function useCreateMerchantCampaign() {
   }, [locale, previewFingerprint, previewInput, previewRetrySeq]);
 
   const submit = useCallback(async (): Promise<boolean> => {
-    if (!user || activeRole !== 'merchant' || isLaunchingRef.current) {
+    if (
+      !user ||
+      activeRole !== 'merchant' ||
+      isLaunchingRef.current ||
+      isImageBusy
+    ) {
       return false;
     }
 
@@ -862,7 +1186,7 @@ export function useCreateMerchantCampaign() {
       isLaunchingRef.current = false;
       setIsLaunching(false);
     }
-  }, [activeRole, draft, locale, router, t, user]);
+  }, [activeRole, draft, isImageBusy, locale, router, t, user]);
 
   return {
     draft,
@@ -873,8 +1197,17 @@ export function useCreateMerchantCampaign() {
     isPreviewLoading,
     hasCompletePreviewInputs: Boolean(previewInput),
     isLaunching,
+    selectedImageUri,
+    imageUploadStatus,
+    imageUploadError,
+    imagePermissionDenied,
+    isImageBusy,
     updateField,
     selectEndsAtDate,
+    pickCampaignImageFromGallery,
+    captureCampaignImageWithCamera,
+    retryImageUpload,
+    removeCampaignImage,
     retryPreview,
     submit,
   };

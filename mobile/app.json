@@ -44,6 +44,14 @@
           "barcodeScannerEnabled": true
         }
       ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "يحتاج تطبيق مردود إلى الوصول للصور لاختيار صورة منتج الحملة.",
+          "cameraPermission": "يحتاج تطبيق مردود إلى إذن الكاميرا لمسح رموز QR الخاصة بالعروض والتقاط صور منتجات الحملات.",
+          "microphonePermission": false
+        }
+      ],
       "@react-native-community/datetimepicker"
     ],
     "experiments": {

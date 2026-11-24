@@ -1,4 +1,4 @@
-import { apiRequest } from '@/core/api';
+import { ApiClientError, apiRequest } from '@/core/api';
 import type { PaginatedResponse } from '@/core/api';
 import type {
   CampaignPreview,
@@ -104,4 +104,75 @@ export async function closeMerchantCampaign(
       auth: true,
     },
   );
+}
+
+export interface CampaignImageUploadAsset {
+  uri: string;
+  mimeType: string;
+  fileName: string;
+}
+
+export interface UploadCampaignImageResponse {
+  imageUrl: string;
+}
+
+const IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
+
+function normalizeImageMimeType(rawMimeType: string): string {
+  const normalized = rawMimeType.trim().toLowerCase();
+  if (!normalized || normalized === 'image/jpg') {
+    return 'image/jpeg';
+  }
+  return normalized;
+}
+
+function normalizeImageFileName(rawFileName: string, mimeType: string): string {
+  const trimmed = rawFileName.trim();
+  if (trimmed.length > 0) {
+    return trimmed;
+  }
+  if (mimeType === 'image/png') {
+    return 'campaign-product.png';
+  }
+  if (mimeType === 'image/webp') {
+    return 'campaign-product.webp';
+  }
+  return 'campaign-product.jpg';
+}
+
+/**
+ * POST /api/v1/merchant/uploads/image
+ * Uploads a single compressed static JPEG/PNG/WebP image in the 'file' field
+ * (strictly 1 file, 0 extra fields) and returns the CDN imageUrl.
+ */
+export async function uploadMerchantCampaignImage(
+  asset: CampaignImageUploadAsset,
+  signal?: AbortSignal,
+): Promise<UploadCampaignImageResponse> {
+  const uri = asset.uri.trim();
+  if (!uri) {
+    throw new ApiClientError(
+      400,
+      'VALIDATION_ERROR',
+      'Submit exactly one valid, static image in the file field.',
+    );
+  }
+
+  const mimeType = normalizeImageMimeType(asset.mimeType);
+  const fileName = normalizeImageFileName(asset.fileName, mimeType);
+
+  const formData = new FormData();
+  formData.append('file', {
+    uri,
+    name: fileName,
+    type: mimeType,
+  } as unknown as Blob);
+
+  return apiRequest<UploadCampaignImageResponse>('/merchant/uploads/image', {
+    method: 'POST',
+    auth: true,
+    body: formData,
+    signal,
+    timeoutMs: IMAGE_UPLOAD_TIMEOUT_MS,
+  });
 }

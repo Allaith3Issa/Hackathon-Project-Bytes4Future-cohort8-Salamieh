@@ -18,6 +18,8 @@ export type ApiErrorCodeKey =
   | 'INSUFFICIENT_LOCKED_BUDGET'
   | 'INSUFFICIENT_CASHBACK_BALANCE'
   | 'INSUFFICIENT_WALLET_BALANCE'
+  | 'PAYOUT_ALREADY_PENDING'
+  | 'PAYOUT_AMOUNT_CHANGED'
   | 'JOIN_REQUEST_PENDING'
   | 'INVALID_STATUS_TRANSITION'
   | 'QR_ALREADY_REDEEMED'
@@ -25,6 +27,10 @@ export type ApiErrorCodeKey =
   | 'VOUCHER_EXCEEDS_BILL'
   | 'IDEMPOTENCY_KEY_REUSED'
   | 'RATE_LIMITED'
+  | 'IMAGE_TOO_LARGE'
+  | 'UNSUPPORTED_IMAGE_FORMAT'
+  | 'IMAGE_UPLOAD_FAILED'
+  | 'IMAGE_UPLOAD_UNAVAILABLE'
   | 'INTERNAL_ERROR'
   | 'API_NOT_CONFIGURED'
   | 'NETWORK_ERROR'
@@ -154,6 +160,17 @@ export interface TranslationDictionary {
     balanceHint: string;
     pendingPayout: string;
     totalEarned: string;
+    totalConfirmedPaidOut: string;
+    requestPayoutAction: string;
+    requestingPayoutAction: string;
+    payoutPendingNotice: string;
+    payoutZeroBalanceHint: string;
+    payoutConfirmTitle: string;
+    payoutConfirmMessage: string;
+    payoutConfirmAmountLabel: string;
+    payoutConfirmAction: string;
+    payoutAmountChangedNotice: string;
+    payoutCreatedBanner: string;
     refreshAction: string;
     loadError: string;
     lastUpdatedLabel: string;
@@ -161,6 +178,7 @@ export interface TranslationDictionary {
     tabStats: string;
     tabByMerchant: string;
     tabTransactions: string;
+    tabPayouts: string;
     statsTitle: string;
     statsLoadError: string;
     clicksLabel: string;
@@ -177,6 +195,23 @@ export interface TranslationDictionary {
     emptyTransactionsTitle: string;
     emptyTransactionsSubtitle: string;
     transactionsLoadError: string;
+    payoutsTitle: string;
+    payoutFilterAll: string;
+    payoutFilterPending: string;
+    payoutFilterConfirmed: string;
+    payoutFilterRejected: string;
+    payoutsLoadError: string;
+    emptyPayoutsTitle: string;
+    emptyPayoutsSubtitle: string;
+    payoutCreatedAtLabel: string;
+    payoutDecidedAtLabel: string;
+    payoutRejectionReasonLabel: string;
+    payoutPendingHint: string;
+    payoutStatuses: {
+      pending_review: string;
+      confirmed: string;
+      rejected: string;
+    };
     loadMore: string;
     loadingMore: string;
     kinds: {
@@ -184,7 +219,6 @@ export interface TranslationDictionary {
       payout_hold: string;
       payout_release_refund: string;
       payout_completed: string;
-      payout_transfer_reversal: string;
     };
   };
   profile: {
@@ -321,8 +355,24 @@ export interface TranslationDictionary {
       productNamePlaceholder: string;
       descriptionLabel: string;
       descriptionPlaceholder: string;
-      imageUrlLabel: string;
-      imageUrlPlaceholder: string;
+      productImageLabel: string;
+      productImageHint: string;
+      pickFromGalleryAction: string;
+      takePhotoAction: string;
+      replaceImageAction: string;
+      removeImageAction: string;
+      compressingImageStatus: string;
+      uploadingImageStatus: string;
+      imageUploadedStatus: string;
+      retryImageUploadAction: string;
+      imageRequiredError: string;
+      imageCompressionFailedError: string;
+      imageReadFailedError: string;
+      galleryPermissionDenied: string;
+      cameraPermissionDenied: string;
+      openSettingsAction: string;
+      cameraUnavailableError: string;
+      verifiedMerchantRequiredForImage: string;
       originalPriceLabel: string;
       originalPricePlaceholder: string;
       originalPriceHint: string;
@@ -356,9 +406,6 @@ export interface TranslationDictionary {
       productNameTooLong: string;
       descriptionRequired: string;
       descriptionTooLong: string;
-      imageUrlRequired: string;
-      imageUrlInvalid: string;
-      imageUrlTooLong: string;
       originalPriceInvalid: string;
       discountPercentInvalid: string;
       discountFinalPriceInvalid: string;
