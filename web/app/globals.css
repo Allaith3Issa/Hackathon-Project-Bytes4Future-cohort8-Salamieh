@@ -19,12 +19,23 @@
 }
 
 @layer base {
+  :root {
+    --lattice-stroke: color-mix(in srgb, var(--color-dusty-mauve) 24%, transparent);
+    --stamp-offset: 3px;
+    --stamp-color: var(--color-dusty-mauve);
+  }
+  :root[dir="rtl"] { --stamp-offset: -3px; }
   body { @apply bg-canvas font-sans text-ink; }
+  body, .pattern-wash, .footer-lattice {
+    background-image:
+      repeating-linear-gradient(45deg, var(--lattice-stroke) 0 1px, transparent 1px 22px),
+      repeating-linear-gradient(-45deg, var(--lattice-stroke) 0 1px, transparent 1px 22px);
+  }
   html:lang(en) body { font-family: "IBM Plex Sans", "IBM Plex Sans Arabic", Tahoma, Arial, sans-serif; }
-  :focus-visible { @apply outline-2 outline-offset-4 outline-action; }
+  :focus-visible { @apply outline-2 outline-offset-4 outline-ink; }
   ::selection { @apply bg-mauve text-ink; }
   input:not([type="hidden"]) {
-    @apply min-h-12 w-full rounded-lg border border-control bg-white px-3 text-ink caret-action;
+    @apply min-h-12 w-full rounded-lg border border-control bg-white px-3 text-ink caret-ink;
   }
   input[aria-invalid="true"] { @apply border-danger; }
   label { @apply text-sm font-semibold; }
@@ -33,20 +44,51 @@
 @layer components {
   .page-wrap { @apply mx-auto w-full max-w-[1200px] px-4 sm:px-6 lg:px-8; }
   .button-primary {
-    @apply inline-flex min-h-11 items-center justify-center rounded-lg bg-action px-5 py-2 text-center font-semibold text-white motion-safe:transition-colors hover:bg-action-hover active:bg-action-hover disabled:cursor-not-allowed disabled:hover:bg-action disabled:opacity-65;
+    @apply inline-flex min-h-11 items-center justify-center rounded-full border border-action-hover bg-action px-5 py-2 text-center font-semibold text-white hover:bg-action-hover active:bg-action-hover disabled:cursor-not-allowed disabled:border-rule disabled:bg-mauve disabled:text-muted;
+    box-shadow: var(--stamp-offset) 3px 0 var(--color-ink);
+  }
+  .button-primary:disabled { box-shadow: none; }
+  .button-primary:active:not(:disabled) { box-shadow: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .button-primary {
+      transition: translate 120ms ease-out, box-shadow 120ms ease-out, background-color 120ms ease-out;
+    }
+    .button-primary:active:not(:disabled) { translate: var(--stamp-offset) 3px; }
   }
   .button-secondary {
     @apply inline-flex min-h-11 items-center justify-center rounded-lg border border-control px-4 py-2 text-center font-semibold motion-safe:transition-colors hover:bg-mauve active:bg-mauve;
   }
-  .text-link { @apply font-semibold text-action underline underline-offset-4; }
+  .header-action {
+    @apply rounded-full border-ink;
+    box-shadow: var(--stamp-offset) 2px 0 var(--stamp-color);
+  }
+  .text-link { @apply font-semibold text-ink underline decoration-control underline-offset-4 hover:decoration-ink; }
   .surface { @apply rounded-xl border border-rule bg-white; }
+  .surface, .stamp-depth { box-shadow: var(--stamp-offset) 3px 0 var(--stamp-color); }
+  .pattern-wash {
+    background-color: color-mix(in srgb, var(--color-mauve) 25%, var(--color-canvas));
+  }
+  .footer-lattice {
+    --lattice-stroke: color-mix(in srgb, var(--color-mauve) 14%, transparent);
+  }
+  .offer-ticket {
+    filter: drop-shadow(var(--stamp-offset) 3px 0 var(--stamp-color));
+  }
+  .ticket-paper {
+    @apply overflow-hidden rounded-lg border border-rule bg-white;
+    /* Punch a repeating row of small holes through each side of the paper. */
+    mask:
+      radial-gradient(circle at 0 6px, transparent 3px, #000 3.6px) left top / 51% 12px repeat-y,
+      radial-gradient(circle at 100% 6px, transparent 3px, #000 3.6px) right top / 51% 12px repeat-y;
+  }
+  .ticket-seam { border-block-end: 2px dotted var(--color-control); }
   .notice { @apply rounded-lg bg-info-bg px-4 py-3 text-sm leading-7 text-info; }
   .notice-error { @apply rounded-lg border border-danger/30 bg-white px-4 py-3 text-sm leading-7 text-danger; }
   .page-title { @apply text-2xl leading-tight font-bold sm:text-3xl; }
   .milestone-meter {
-    @apply block h-2 w-full overflow-hidden rounded-full bg-mauve accent-action;
+    @apply block h-2 w-full overflow-hidden rounded-full bg-mauve accent-ink;
   }
   .milestone-meter::-webkit-progress-bar { @apply bg-mauve; }
-  .milestone-meter::-webkit-progress-value { @apply rounded-full bg-action; }
-  .milestone-meter::-moz-progress-bar { @apply rounded-full bg-action; }
+  .milestone-meter::-webkit-progress-value { @apply rounded-full bg-ink; }
+  .milestone-meter::-moz-progress-bar { @apply rounded-full bg-ink; }
 }

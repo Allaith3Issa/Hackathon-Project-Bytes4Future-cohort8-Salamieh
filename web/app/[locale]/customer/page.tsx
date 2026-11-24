@@ -43,7 +43,7 @@ export default async function CustomerPage({
   return (
     <div className="page-wrap space-y-6 py-7 sm:space-y-8 sm:py-12">
       <h1 className="page-title">{t("common.cashback")}</h1>
-      <dl className="grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
+      <dl className="stamp-depth grid overflow-hidden rounded-xl border border-rule sm:grid-cols-[1.2fr_0.8fr]">
         <div className="bg-ink p-5 text-white sm:p-7">
           <dt className="text-sm font-semibold">{t("customer.availableBalance")}</dt>
           <dd className="mt-3 text-3xl font-bold leading-tight tabular-nums sm:text-4xl">{formatSyp(dashboard.availableCashbackSyp)}</dd>

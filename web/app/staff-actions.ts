@@ -12,6 +12,8 @@ import type {
   OfferRedeemResult, ScannerLookup,
 } from "@/lib/staff-contract";
 import { parseMoney, parsePercent, parsePositiveMoney, staffError } from "@/lib/staff-ui";
+import { campaignFormSession, uploadCampaignImage, type CampaignUpload } from "@/lib/campaign-upload";
+import { maxProductImageBytes, productImageTypes } from "@/lib/product-image";
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const KEY_ERROR = "auth.weCouldnTPrepareTheRequest";
@@ -115,11 +117,15 @@ export interface CampaignState {
   preview?: { key: string; values: CampaignPreview };
   error?: string;
   errors?: Record<string, string>;
+  upload?: CampaignUpload;
+  imageErrorKey?: string;
 }
 
-export async function campaignAction(state: CampaignState, data: FormData): Promise<CampaignState> {
-  await requireRole("merchant");
+export async function campaignAction(expectedScope: string, state: CampaignState, data: FormData): Promise<CampaignState> {
+  const merchant = await requireRole("merchant");
   const { t } = await getI18n();
+  const session = await campaignFormSession(merchant.id);
+  if (!session || session.scope !== expectedScope) return { error: t("productImage.sessionChanged") };
   const launch = text(data, "intent") === "launch";
   const key = text(data, "key");
   const preview = state.preview?.key === key ? state.preview : undefined;
@@ -134,33 +140,52 @@ export async function campaignAction(state: CampaignState, data: FormData): Prom
   if (!maxItems || maxItems > 2147483647) errors.maxItems = t("validation.enterAWholeNumberOfItems");
   const productName = text(data, "productName");
   const description = text(data, "description");
-  const imageUrl = text(data, "imageUrl");
+  const image = data.get("file");
   const endsRaw = text(data, "endsAt");
   const endsAt = endsRaw ? new Date(`${endsRaw}+03:00`) : null; 
   if (launch) {
     if (!productName) errors.productName = t("validation.enterTheProductName");
     if (!description) errors.description = t("validation.enterAProductDescription");
-    if (!/^https?:\/\/\S+$/i.test(imageUrl)) errors.imageUrl = t("validation.enterAnImageUrlStartingWith");
+    if (!(image instanceof File) || !image.size) errors.imageUrl = t("productImage.required");
+    else if (image.size > maxProductImageBytes) errors.imageUrl = t("productImage.tooLarge");
+    else if (!productImageTypes.includes(image.type)) errors.imageUrl = t("productImage.invalidType");
     if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt.getTime() <= Date.now()) errors.endsAt = t("validation.chooseAnEndDateInThe");
   }
-  if (Object.keys(errors).length) return { preview, errors };
+  if (Object.keys(errors).length) return { preview, errors, upload: state.upload, imageErrorKey: key };
   if (!uuid.test(key)) return { error: t(KEY_ERROR) };
   const base = {
     campaignType: "product", originalPriceSyp: price, discountPercent: discount,
     commission: { type: "fixed", amountSyp: commission }, maxItems,
   };
+  let upload = state.upload;
   try {
     if (!launch) {
       const values = await authenticatedRequest<CampaignPreview>("/merchant/campaigns/preview", { method: "POST", body: base });
-      return { preview: { key, values } };
+      return { preview: { key, values }, upload };
+    }
+    if (!(image instanceof File)) return { preview, upload, errors: { imageUrl: t("productImage.required") }, imageErrorKey: key };
+    try {
+      upload = await uploadCampaignImage(image, session.sessionId, upload);
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : "";
+      const messages = {
+        VALIDATION_ERROR: "productImage.invalidFile", IMAGE_TOO_LARGE: "productImage.tooLarge",
+        UNSUPPORTED_IMAGE_FORMAT: "productImage.invalidType", IMAGE_UPLOAD_FAILED: "productImage.uploadFailed",
+        IMAGE_UPLOAD_UNAVAILABLE: "productImage.uploadUnavailable",
+      } as const;
+      let message = t("productImage.uploadFailed");
+      if (Object.hasOwn(messages, code)) message = t(messages[code as keyof typeof messages]);
+      else if (error instanceof ApiError && error.status === 404) message = t("productImage.uploadUnavailable");
+      else if (error instanceof ApiError && [401, 403, 429].includes(error.status)) message = staffError(error, t);
+      return { preview, upload, errors: { imageUrl: message }, imageErrorKey: key };
     }
     const campaign = await authenticatedRequest<MerchantCampaign>("/merchant/campaigns", {
       method: "POST", idempotencyKey: key,
-      body: { ...base, productName, description, imageUrl, endsAt: endsAt!.toISOString(), joinMode: "open" },
+      body: { ...base, productName, description, imageUrl: upload.imageUrl, endsAt: endsAt!.toISOString(), joinMode: "open" },
     });
     return redirectLocalized(`/merchant/campaigns/${encodeURIComponent(campaign.id)}`);
   } catch (error) {
-    if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, error: staffError(error, t) };
+    if (error instanceof ApiError || (error as { digest?: string })?.digest === undefined) return { preview, upload, error: staffError(error, t) };
     throw error;
   }
 }

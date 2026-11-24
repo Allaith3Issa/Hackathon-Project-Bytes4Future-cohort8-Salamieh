@@ -12,7 +12,7 @@ interface CustomerAuthCardProps {
 
 export function CustomerAuthCard({ title, description, icon, headingRef, width = "max-w-md", children }: CustomerAuthCardProps) {
   return (
-    <div className={`${styles.page} grid place-items-center px-4 py-5 sm:px-6 sm:py-8`}>
+    <div className={`${styles.page} pattern-wash grid place-items-center px-4 py-5 sm:px-6 sm:py-8`}>
       <section aria-labelledby="customer-auth-title" className={`surface w-full p-5 sm:p-7 ${width}`}>
         <header className="border-b border-rule pb-4">
           {icon && <span className="mb-3 grid size-9 place-items-center rounded-lg bg-mauve text-ink" aria-hidden="true">
