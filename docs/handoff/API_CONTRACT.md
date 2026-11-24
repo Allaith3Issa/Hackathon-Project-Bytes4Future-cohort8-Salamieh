@@ -34,7 +34,7 @@ Validation errors may include `fieldErrors: Record<string, string[]>`. Scoped pr
 | `401` | `AUTH_REQUIRED`, `INVALID_CREDENTIALS`, `REFRESH_TOKEN_INVALID`, `SESSION_EXPIRED` |
 | `403` | `FORBIDDEN`, `MERCHANT_NOT_VERIFIED`, `SELF_PROMOTION_FORBIDDEN` |
 | `404` | `NOT_FOUND` |
-| `409` | `AMOUNT_OUT_OF_RANGE`, `PHONE_ALREADY_REGISTERED`, `CAMPAIGN_ENDED`, `CAMPAIGN_LIMIT_EXCEEDED`, `INSUFFICIENT_MERCHANT_BALANCE`, `INSUFFICIENT_LOCKED_BUDGET`, `INSUFFICIENT_CASHBACK_BALANCE`, `INSUFFICIENT_WALLET_BALANCE`, `JOIN_REQUEST_PENDING`, `INVALID_STATUS_TRANSITION`, `QR_ALREADY_REDEEMED`, `QR_EXPIRED`, `VOUCHER_EXCEEDS_BILL`, `IDEMPOTENCY_KEY_REUSED` |
+| `409` | `AMOUNT_OUT_OF_RANGE`, `PHONE_ALREADY_REGISTERED`, `CAMPAIGN_ENDED`, `CAMPAIGN_LIMIT_EXCEEDED`, `INSUFFICIENT_MERCHANT_BALANCE`, `INSUFFICIENT_LOCKED_BUDGET`, `INSUFFICIENT_CASHBACK_BALANCE`, `INSUFFICIENT_WALLET_BALANCE`, `PAYOUT_ALREADY_PENDING`, `PAYOUT_AMOUNT_CHANGED`, `JOIN_REQUEST_PENDING`, `INVALID_STATUS_TRANSITION`, `QR_ALREADY_REDEEMED`, `QR_EXPIRED`, `VOUCHER_EXCEEDS_BILL`, `IDEMPOTENCY_KEY_REUSED` |
 | `429` | `RATE_LIMITED` |
 | `500` | `INTERNAL_ERROR` |
 | `503` | `DATABASE_UNAVAILABLE` |
@@ -438,23 +438,20 @@ type StoreDiscountPreview = {
 
 ## Marketer wallet, per-merchant breakdown, payouts & stats
 
-The marketer wallet balance supports the MVP. Per-merchant earnings, transaction history, and stats are implemented extra endpoints. All payout routes and `/public/leaderboard` are deferred.
+The wallet, per-merchant earnings, transaction history, stats and simulated payout routes below are implemented. `/public/leaderboard` is deferred.
 
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
 | `GET /marketer/wallet` | Marketer | None | `200 MarketerWallet` |
 | `GET /marketer/wallet/by-merchant` | Marketer | Pagination | `200 Page<MarketerMerchantEarnings>` |
 | `GET /marketer/wallet/transactions` | Marketer | Pagination | `200 Page<MarketerWalletTransaction>` |
-| `POST /marketer/payouts` | Marketer | `{ amountSyp, method, accountDetails }` + `Idempotency-Key` | `201 PayoutRequest` |
+| `POST /marketer/payouts` | Marketer | `{ expectedAmountSyp: number }` + `Idempotency-Key` (UUID) | `201 PayoutRequest` |
 | `GET /marketer/payouts` | Marketer | Pagination, optional `status` | `200 Page<PayoutRequest>` |
-| `POST /marketer/payouts/{payoutId}/confirm` | Marketer owner | None | `200 PayoutRequest` (`transferred` -> `confirmed`) |
-| `POST /marketer/payouts/{payoutId}/dispute` | Marketer owner | `{ reason: string }` | `200 PayoutRequest` (`transferred` -> `disputed`) |
 | `GET /marketer/stats` | Marketer | None | `200 MarketerStats` |
 | `GET /public/leaderboard` | Public, optional bearer | Pagination | `200 Page<LeaderboardEntry> & { myRank: number \| null }` |
 
 ```ts
-type PayoutMethod = 'sham_cash' | 'syriatel_cash' | 'cash';
-type PayoutStatus = 'pending_review' | 'transferred' | 'confirmed' | 'disputed' | 'rejected';
+type PayoutStatus = 'pending_review' | 'confirmed' | 'rejected';
 
 type MarketerWallet = {
   availableBalanceSyp: number;
@@ -473,7 +470,7 @@ type MarketerMerchantEarnings = {
 
 type MarketerWalletTransaction = {
   id: string;
-  kind: 'marketer_commission_credit' | 'payout_hold' | 'payout_release_refund' | 'payout_completed' | 'payout_transfer_reversal';
+  kind: 'marketer_commission_credit' | 'payout_hold' | 'payout_release_refund' | 'payout_completed';
   amountSyp: number;
   campaignId: string | null;
   campaignName: string | null;
@@ -483,27 +480,14 @@ type MarketerWalletTransaction = {
 
 type PayoutRequest = {
   id: string;
-  marketerId: string;
-  marketerName: string;
-  marketerPhone: string;
   amountSyp: number;
-  method: PayoutMethod;
-  accountDetails: string;
   status: PayoutStatus;
-  transferReference: string | null;
-  transferReceiptUrl: string | null;
-  transferredAt: string | null;
-  confirmedAt: string | null;
-  disputeReason: string | null;
-  rejectionReason: string | null;
-  disputeResolution: {
-    outcome: 'confirm_paid' | 'return_funds';
-    note: string;
-    reversalReference: string | null;
-    resolvedAt: string;
-  } | null;
   createdAt: string;
+  decidedAt: string | null;
+  rejectionReason: string | null;
 };
+
+type AdminPayoutRequest = PayoutRequest & { marketerId: string; marketerName: string };
 
 type MarketerStats = { clicks: number; itemsSold: number; earnedSyp: number; conversionRatePercent: number };
 type MerchantStats = {
@@ -527,7 +511,7 @@ type LeaderboardEntry = { rank: number; marketerId: string; name: string; earned
 
 ## Administration
 
-Merchant top-up supports the MVP. Merchant verification, top-up history, and the three `/admin/revenue` reads are implemented extra endpoints. Admin payout operations and `/admin/users`, `/admin/campaigns`, and `/admin/overview` are deferred. Admin revenue and the broader overview are separate reports.
+Merchant verification, top-up and top-up history, simulated payout decisions, and the three `/admin/revenue` reads are implemented. `/admin/users`, `/admin/campaigns`, and `/admin/overview` remain deferred. The future overview will derive marketer liabilities from available and pending wallet balances. Simulated completions do not count as platform revenue or external cash transfers.
 
 | Method and path | Access | Request | Success |
 | --- | --- | --- | --- |
@@ -535,11 +519,9 @@ Merchant top-up supports the MVP. Merchant verification, top-up history, and the
 | `PATCH /admin/merchants/{merchantId}/verification` | Admin | `{ status: "verified" \| "rejected", contractReference?: string }` | `200 AdminMerchant` |
 | `POST /admin/merchants/{merchantId}/topups` | Admin | `{ amountSyp, paymentMethod, referenceNote }` + `Idempotency-Key` | `201 AdminTopupResult` |
 | `GET /admin/topups` | Admin | Pagination, optional `merchantId` | `200 Page<AdminTopupHistoryEntry>` |
-| `GET /admin/payouts` | Admin | Pagination, optional `status` | `200 Page<PayoutRequest>` |
-| `POST /admin/payouts/{payoutId}/upload-receipt` | Admin | Multipart form image (`receipt`) | `200 { transferReceiptUrl: string }` |
-| `PATCH /admin/payouts/{payoutId}/mark-transferred` | Admin | `{ transferReference, transferReceiptUrl }` | `200 PayoutRequest` |
-| `PATCH /admin/payouts/{payoutId}/reject` | Admin | `{ reason: string }` | `200 PayoutRequest` (`pending_review` → `rejected`) |
-| `PATCH /admin/payouts/{payoutId}/resolve-dispute` | Admin | `{ outcome: 'confirm_paid', note }` or `{ outcome: 'return_funds', note, reversalReference }` | `200 PayoutRequest` (`disputed` → `confirmed` or `rejected`) |
+| `GET /admin/payouts` | Admin | Pagination, optional `status` | `200 Page<AdminPayoutRequest>` |
+| `PATCH /admin/payouts/{payoutId}/approve` | Admin | None | `200 AdminPayoutRequest` (`pending_review` → `confirmed`) |
+| `PATCH /admin/payouts/{payoutId}/reject` | Admin | `{ reason: string }` | `200 AdminPayoutRequest` (`pending_review` → `rejected`) |
 | `GET /admin/users` | Admin | Pagination, optional `role` | `200 Page<AdminUser>` |
 | `GET /admin/campaigns` | Admin | Pagination, optional `status` | `200 Page<AdminCampaign>` |
 | `GET /admin/overview` | Admin | None | `200 AdminOverview` |
@@ -557,9 +539,40 @@ The revenue summary returns net platform fees and the total commissions earned b
 
 The marketer earnings list returns one row per marketer account, including multi-role accounts and marketers with no settled sales. Rows contain `id`, `name`, `phone`, `salesCount` (settled sales attributed to that marketer), and `totalEarnedSyp` (commission from those sales in new SYP minor units). Rows are ordered by account creation time descending, then ID descending. Marketers without settled sales have zero sales and zero commission. This admin-only report uses the same no-store and monetary range rules.
 
-### Payout accounting (future)
+### Simulated payouts
 
-Marketer payouts are disabled during the three-day MVP. `MarketerWallet.totalConfirmedPaidOutSyp` remains a number and is `0` while confirmed payouts cannot exist. When payouts are enabled, derive the total from verified, persisted confirmed payouts. Never estimate an unavailable historical total.
+All payout reads and decisions use `Cache-Control: no-store`. Marketers see only their own payout history. Admins can filter the complete queue by `pending_review`, `confirmed` or `rejected`. Both lists use the standard page envelope, ordered by `createdAt` descending and then `id` descending. The admin response adds only `marketerId` and `marketerName`.
+
+Submit the exact displayed available balance as a positive safe integer. A successful request moves the full balance from available to pending and posts `payout_hold`. A same-key replay returns the original `201` and body even after a decision. A different valid payload with a committed key returns `409 IDEMPOTENCY_KEY_REUSED`. A new request while a hold exists returns `409 PAYOUT_ALREADY_PENDING`. A zero available balance returns `409 INSUFFICIENT_WALLET_BALANCE`; a stale positive balance returns `409 PAYOUT_AMOUNT_CHANGED` and requires a fresh wallet read and confirmation.
+
+Admin approval accepts no body. It clears the hold, records the deciding admin and time, and posts `payout_completed` without debiting available again. Rejection accepts a trimmed, nonempty `reason` of at most 500 characters. It clears the hold, restores the reserved amount, records the decision, and posts `payout_release_refund`. Repeating the same decision returns `200` with the stored result. A conflicting decision or changed rejection reason returns `409 INVALID_STATUS_TRANSITION`. Unknown payout IDs return `404 NOT_FOUND`.
+
+All amounts are new SYP minor units. Payout results change neither lifetime commission, merchant wallets, campaign reserves, customer cashback, settled sales nor platform revenue. `totalConfirmedPaidOutSyp` sums confirmed simulations. Wallet history shows the three payout movements with null campaign and shop fields. The scanner checks available plus pending plus the incoming commission under the marketer wallet lock. An overflow returns `409 AMOUNT_OUT_OF_RANGE` and rolls back settlement. An approval that would overflow the confirmed cumulative total also returns that error. Invalid body, UUID, query or key responses use `400 VALIDATION_ERROR`; missing or invalid authentication uses `401 AUTH_REQUIRED` or `SESSION_EXPIRED`; wrong-role requests use `403 FORBIDDEN`; unexpected failures use sanitized `500 INTERNAL_ERROR`. All errors use `{ statusCode, code, message }`.
+
+#### Web and Expo integration
+
+- **Alaa, marketer Web.** Read `GET /api/v1/marketer/wallet` and `GET /api/v1/marketer/payouts`. Disable withdrawal when available is zero or a request is pending. Confirm the exact shown amount. Send `POST /api/v1/marketer/payouts` with `Idempotency-Key: <UUID>` and `{ "expectedAmountSyp": 50000 }`. Retry an ambiguous response with the same key and body. On `PAYOUT_AMOUNT_CHANGED`, refresh and require reconfirmation. Refresh the wallet and history after mutations and display decisions and rejection reasons.
+- **Tayma, Admin Web.** Read `GET /api/v1/admin/payouts?status=pending_review&page=1&pageSize=20`. Display marketer name, amount, date and status. Confirm an empty-body `PATCH /api/v1/admin/payouts/<UUID>/approve` or send `PATCH /api/v1/admin/payouts/<UUID>/reject` with `{ "reason": "The request could not be approved" }`. Disable duplicate submissions while pending and refresh the queue and related reports afterward.
+- **Ismail, Expo.** Use the same authenticated marketer URLs, amount confirmation and retry rules. Display available/pending amounts and history, including terminal decisions. Invalidate wallet and payout history caches after changes and on relevant refreshes. Keep Arabic, English and RTL behavior.
+
+All clients use the real API, display minor units at scale 100, preserve their existing session boundary, and label the actions **simulated**.
+
+### Deferred external payout workflow
+
+Real money transfers, payment account details, transfer receipts, cash-out references, confirmations, disputes and automatic confirmation remain deferred. Any future implementation must distinguish real transfers and their accounting from simulated records. The former design proposed these operations and extensions. They are not part of the simulated contract.
+
+| Future operation | Proposed input and behavior |
+| --- | --- |
+| `POST /marketer/payouts` | Extended request `{ amountSyp, method, accountDetails }` with `Idempotency-Key`; method `sham_cash`, `syriatel_cash` or `cash` |
+| `GET /marketer/payouts`, `GET /admin/payouts` | Expanded history with transfer metadata and the future `transferred` and `disputed` statuses |
+| `POST /marketer/payouts/{payoutId}/confirm` | Owner confirms receipt of a transferred payout |
+| `POST /marketer/payouts/{payoutId}/dispute` | Owner disputes a transfer with `{ reason }` |
+| `POST /admin/payouts/{payoutId}/upload-receipt` | Multipart `receipt`, returning `{ transferReceiptUrl }` |
+| `PATCH /admin/payouts/{payoutId}/mark-transferred` | `{ transferReference, transferReceiptUrl }` |
+| `PATCH /admin/payouts/{payoutId}/reject` | Pre-transfer rejection with `{ reason }` |
+| `PATCH /admin/payouts/{payoutId}/resolve-dispute` | `{ outcome: 'confirm_paid', note }` or `{ outcome: 'return_funds', note, reversalReference }` |
+
+The deferred expanded record included marketer phone, method and account details, transfer reference and receipt URL, transferred and confirmed timestamps, dispute reason, rejection reason, and resolution outcome, note, reversal reference and timestamp. A verified reversal would add `payout_transfer_reversal` to history.
 
 - Requesting a payout moves funds from available to pending. Only a `pending_review` request can be rejected before transfer. Rejection releases the hold once.
 - After sending funds, the admin records the receipt and a transfer reference unique per payment method. Moving to `transferred` clears the pending hold and records the external cash outflow in the same transaction. Repeating the same recorded transfer returns its existing result. Conflicting transfers or invalid transitions return `409 INVALID_STATUS_TRANSITION`.
